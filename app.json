@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "MyLife",
+    "slug": "mylife",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#FFF9F7"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFF9F7"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.mylife",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "expo-font",
+      "@react-native-community/datetimepicker",
+      "expo-notifications",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-7366543760319067~8975362454",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      "@react-native-firebase/app"
+    ]
+  }
+}

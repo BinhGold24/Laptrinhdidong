@@ -1,0 +1,30 @@
+{
+  "name": "mylife",
+  "version": "1.0.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start --metro-port 8082",
+    "android": "expo run:android --port 8082",
+    "ios": "expo run:ios"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.4.4",
+    "@react-native-firebase/analytics": "23.8.8",
+    "@react-native-firebase/app": "23.8.8",
+    "expo": "~54.0.0",
+    "expo-dev-client": "~6.0.21",
+    "expo-font": "~14.0.12",
+    "expo-notifications": "~0.32.17",
+    "expo-status-bar": "~3.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-google-mobile-ads": "^15.7.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
+  }
+}
