@@ -48,3 +48,14 @@ Các giá trị `category`: `work`, `personal`, `health`, `other`. Tài nguyên 
 - Firebase Analytics trên Android ghi lượt xem tab và các thao tác tạo, sửa, xóa, hoàn thành hoặc mở lại lịch; không gửi tên hay ghi chú lịch trình.
 - Phân loại hoạt động, thêm ghi chú và theo dõi thống kê cơ bản.
 - Báo lỗi kết nối/lưu dữ liệu và cho phép tải lại từ MockAPI.
+
+
+
+
+
+
+link báo cáo BTL :https://docs.google.com/document/d/1KLLr8W1-ihK9Xot_x1ywMWeBqsiJ9HqZBnx0-TDiCvQ/edit?tab=t.0
+
+link họp nhóm tuần 1: https://drive.google.com/file/d/1gOqebTEfnk7pjL9Gcbte006-uVQSycw0/view?usp=drive_link
+
+link họp nhóm tuần 2:
