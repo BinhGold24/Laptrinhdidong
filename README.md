@@ -58,4 +58,4 @@ link báo cáo BTL :https://docs.google.com/document/d/1KLLr8W1-ihK9Xot_x1ywMWeB
 
 link họp nhóm tuần 1: https://drive.google.com/file/d/1gOqebTEfnk7pjL9Gcbte006-uVQSycw0/view?usp=drive_link
 
-link họp nhóm tuần 2+ demo:
+link họp nhóm tuần 2+ demo: https://drive.google.com/file/d/1ALprSTD2hsDoPSEuXVCppXa3qbMQHdnZ/view?usp=sharing
