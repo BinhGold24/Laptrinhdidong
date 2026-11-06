@@ -11,22 +11,45 @@ export default function TopBar({
   selectedDateMood,
   onPressSticker,
   onPressProfile,
+  isProUser = false,
+  accountRole = 'guest', // 'guest' | 'member' | 'pro'
+  onPressPro,
+  onPressAuth,
 }) {
   return (
     <View style={styles.topBar}>
       <Pressable style={styles.brand} onPress={onPressProfile}>
-        <View style={[styles.brandIcon, { backgroundColor: theme.primary }]}>
-          <Text style={{ fontSize: 16 }}>{theme.icon}</Text>
+        <View style={[styles.brandIcon, { backgroundColor: accountRole === 'pro' ? '#FFD700' : theme.primary }]}>
+          <Text style={{ fontSize: 16 }}>{accountRole === 'pro' ? '👑' : accountRole === 'member' ? '🐰' : theme.icon}</Text>
         </View>
         <View>
-          <Text style={[styles.brandName, { color: theme.ink }]}>
-            CalendarCute<Text style={{ color: theme.primary }}>.</Text>
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Text style={[styles.brandName, { color: theme.ink }]}>
+              CalendarCute<Text style={{ color: theme.primary }}>.</Text>
+            </Text>
+            {accountRole === 'pro' && (
+              <View style={[styles.proPill, { backgroundColor: '#FFD700' }]}>
+                <Text style={styles.proPillText}>PRO VIP</Text>
+              </View>
+            )}
+            {accountRole === 'member' && (
+              <View style={[styles.proPill, { backgroundColor: theme.primaryLight }]}>
+                <Text style={[styles.proPillText, { color: theme.primary }]}>Thành viên</Text>
+              </View>
+            )}
+            {accountRole === 'guest' && (
+              <View style={[styles.proPill, { backgroundColor: theme.line }]}>
+                <Text style={[styles.proPillText, { color: theme.muted }]}>Thường</Text>
+              </View>
+            )}
+          </View>
           <Text style={[styles.brandTagline, { color: theme.muted }]}>
-            {t.brandTagline}
+            {accountRole === 'guest' ? 'Chưa đăng ký • Chạm để tạo' : t.brandTagline}
           </Text>
         </View>
       </Pressable>
+
+
 
       <View style={styles.topBarActions}>
         {/* Quick Language Switcher */}
@@ -109,4 +132,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  proPill: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  proPillText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#6A4300',
+  },
 });
+

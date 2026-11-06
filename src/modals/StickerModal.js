@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, Modal, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CUTE_STICKERS } from '../constants/data';
 import { dateLabel } from '../utils/dateUtils';
@@ -11,10 +11,56 @@ export default function StickerModal({
   t,
   selectedDateStr,
   selectedDateSticker,
+  stickers = CUTE_STICKERS,
+  isProUser = false,
+  accountRole = 'guest', // 'guest' | 'member' | 'pro'
+  ownedStickers = [],
   onClose,
   onSelectSticker,
   onRemoveSticker,
+  onOpenProModal,
+  onOpenAuthModal,
 }) {
+  const stickerList = stickers && stickers.length > 0 ? stickers : CUTE_STICKERS;
+  const effectiveOwned = accountRole === 'guest' ? ['🌸'] : ownedStickers;
+
+  const handlePressSticker = (stk) => {
+    const isUnlocked = isProUser || effectiveOwned.includes(stk);
+    if (!isUnlocked) {
+      if (accountRole === 'guest') {
+        Alert.alert(
+          'Tài khoản Thường',
+          'Bạn đang sử dụng Tài khoản Thường (chưa đăng ký). Hãy đăng ký bằng số điện thoại để nhận ngay 3 sticker ngẫu nhiên, hoặc nâng cấp PRO để mở khóa tất cả!',
+          [
+            { text: 'Để sau', style: 'cancel' },
+            {
+              text: 'Đăng Ký Nhận 3 Sticker 🎁',
+              onPress: () => {
+                onClose();
+                if (onOpenAuthModal) onOpenAuthModal();
+              },
+            },
+            {
+              text: 'Xem Gói PRO 👑',
+              onPress: () => {
+                onClose();
+                if (onOpenProModal) onOpenProModal();
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      if (onOpenProModal) {
+        onClose();
+        onOpenProModal();
+      }
+      return;
+    }
+    onSelectSticker(stk);
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -22,10 +68,31 @@ export default function StickerModal({
         <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.modalHeader}>
-            <View>
-              <Text style={[styles.modalTitle, { color: theme.ink }]}>{t.modalStickerTitle}</Text>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.modalTitle, { color: theme.ink }]}>{t.modalStickerTitle}</Text>
+                {accountRole === 'pro' && (
+                  <View style={[styles.proBadge, { backgroundColor: '#FFD700' }]}>
+                    <Text style={styles.proBadgeText}>👑 PRO VIP FULL</Text>
+                  </View>
+                )}
+                {accountRole === 'member' && (
+                  <View style={[styles.proBadge, { backgroundColor: theme.primaryLight }]}>
+                    <Text style={[styles.proBadgeText, { color: theme.primary }]}>Thành viên</Text>
+                  </View>
+                )}
+                {accountRole === 'guest' && (
+                  <View style={[styles.proBadge, { backgroundColor: theme.line }]}>
+                    <Text style={[styles.proBadgeText, { color: theme.muted }]}>Tài khoản Thường</Text>
+                  </View>
+                )}
+              </View>
               <Text style={[styles.modalSubtitle, { color: theme.muted }]}>
-                {t.modalStickerSub(dateLabel(selectedDateStr, lang))}
+                {accountRole === 'pro'
+                  ? 'Bản Thành viên PRO: Bạn có thể chọn sticker thoải mái!'
+                  : accountRole === 'member'
+                  ? `Tài khoản Thành viên: Đang có ${ownedStickers.length} sticker sở hữu. Hoàn thành 20 tầng Kim Tự Tháp để mở full!`
+                  : 'Tài khoản Thường (Chưa ĐK): Có 1 sticker mặc định. Đăng ký để nhận 3 sticker ngẫu nhiên!'}
               </Text>
             </View>
             <Pressable style={[styles.closeButton, { backgroundColor: theme.surface }]} onPress={onClose}>
@@ -33,16 +100,33 @@ export default function StickerModal({
             </Pressable>
           </View>
 
+
           <ScrollView contentContainerStyle={styles.stickerGrid}>
-            {CUTE_STICKERS.map((stk, idx) => (
-              <Pressable
-                key={`stk-${idx}`}
-                style={[styles.stickerCell, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={() => onSelectSticker(stk)}
-              >
-                <Text style={{ fontSize: 28 }}>{stk}</Text>
-              </Pressable>
-            ))}
+            {stickerList.map((stk, idx) => {
+              const isUnlocked = isProUser || effectiveOwned.includes(stk);
+
+              return (
+                <Pressable
+                  key={`stk-${idx}`}
+                  style={[
+                    styles.stickerCell,
+                    {
+                      backgroundColor: isUnlocked ? theme.surface : theme.line,
+                      borderColor: isUnlocked ? theme.border : '#DDD',
+                      opacity: isUnlocked ? 1 : 0.6,
+                    },
+                  ]}
+                  onPress={() => handlePressSticker(stk)}
+                >
+                  <Text style={{ fontSize: 28 }}>{stk}</Text>
+                  {!isUnlocked && (
+                    <View style={styles.lockBadge}>
+                      <Ionicons name="lock-closed" size={11} color="#fff" />
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
           </ScrollView>
 
           {selectedDateSticker ? (
@@ -59,6 +143,7 @@ export default function StickerModal({
     </Modal>
   );
 }
+
 
 const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(28,22,34,0.35)' },
@@ -93,5 +178,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  proBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  proBadgeText: { fontSize: 10, fontWeight: '900', color: '#6A4300' },
+  lockBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#888',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

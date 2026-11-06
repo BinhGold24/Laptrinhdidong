@@ -23,19 +23,23 @@ import mobileAds, {
 // Constants & Data
 import { THEMES } from './src/constants/themes';
 import { TRANSLATIONS } from './src/constants/translations';
-import { CONFIG } from './src/constants/data';
+import { CONFIG, CUTE_STICKERS } from './src/constants/data';
+
 
 // Utils
 import { dateKey, parseDateTime, timeString, getWeek } from './src/utils/dateUtils';
 
 // Services
-import { request, normalizeEvent } from './src/services/api';
+import { request, normalizeEvent, fetchStickersApi } from './src/services/api';
 import { fetchRealWeather } from './src/services/weatherService';
 import {
   setupNotifications,
   getEventReminders,
   cancelReminders,
   scheduleEventReminders,
+  scheduleMorningGreeting,
+  sendScheduleAlert,
+  sendWelcomeAccountAlert,
 } from './src/services/notificationService';
 import { trackAnalyticsEvent, trackScreenView } from './src/services/analyticsService';
 
@@ -57,9 +61,12 @@ import HabitModal from './src/modals/HabitModal';
 import TodoModal from './src/modals/TodoModal';
 import DDayModal from './src/modals/DDayModal';
 import EventEditorModal from './src/modals/EventEditorModal';
+import AuthModal from './src/modals/AuthModal';
+import PyramidRewardModal from './src/modals/PyramidRewardModal';
 
 // Setup push notification handler
 setupNotifications();
+
 
 export default function App() {
   // Language & Theme State
@@ -134,10 +141,49 @@ export default function App() {
   const [newDDayDate, setNewDDayDate] = useState(dateKey(new Date()));
   const [newDDayIcon, setNewDDayIcon] = useState('🎉');
 
+  // User Account & Stickers State
+  const [userAccount, setUserAccount] = useState(null); // { phone, email, password, registeredAt }
+  const [ownedStickers, setOwnedStickers] = useState([]); // Sticker nhận được khi đăng ký
+  const [apiStickers, setApiStickers] = useState(CUTE_STICKERS);
+
+  // Pro Membership & Pyramid Rewards
+  const [proExpiresAt, setProExpiresAt] = useState(0);
+  const [proTrialUsed, setProTrialUsed] = useState(false);
+  // Chỉ tài khoản ĐÃ ĐĂNG NHẬP và CÒN HẠN MỚI LÀ PRO VIP
+  const isProUser = useMemo(() => {
+    return !!userAccount && Number(proExpiresAt) > Date.now();
+  }, [userAccount, proExpiresAt]);
+  const proDaysLeft = useMemo(
+    () => Math.max(0, Math.ceil((proExpiresAt - Date.now()) / (24 * 60 * 60 * 1000))),
+    [proExpiresAt]
+  );
+
+  // Phân quyền tài khoản:
+  // - 'guest': Tài khoản thường (chưa đăng ký) -> 1 sticker cơ bản 🌸, có quảng cáo
+  // - 'member': Tài khoản thành viên (đã đăng ký) -> 3 sticker, kích hoạt SMS & Gmail, có quảng cáo
+  // - 'pro': Tài khoản PRO VIP -> Không quảng cáo, full sticker, lặp lịch tự động
+  const accountRole = useMemo(() => {
+    if (!userAccount) return 'guest';
+    if (isProUser) return 'pro';
+    return 'member';
+  }, [userAccount, isProUser]);
+
+  // Bộ sticker khả dụng theo cấp độ phân quyền
+  const effectiveOwnedStickers = useMemo(() => {
+    if (accountRole === 'pro') return apiStickers;
+    if (accountRole === 'member') return ownedStickers.length > 0 ? ownedStickers : ['🌸', '🍓', '🐱'];
+    return ['🌸']; // Tài khoản thường (chưa đăng ký) chỉ có 1 sticker mặc định
+  }, [accountRole, apiStickers, ownedStickers]);
+
+  // Additional Modals Visibility
+  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [pyramidRewardModalVisible, setPyramidRewardModalVisible] = useState(false);
+
+
   // AdMob States
   const [adsInitialized, setAdsInitialized] = useState(false);
   const [navigationPending, setNavigationPending] = useState(false);
-  const [topBannerVisible, setTopBannerVisible] = useState(true);
+  const [bottomBannerVisible, setBottomBannerVisible] = useState(true);
   const interstitial = useMemo(
     () => InterstitialAd.createForAdRequest(CONFIG.INTERSTITIAL_AD_UNIT_ID, {
       requestNonPersonalizedAdsOnly: true,
@@ -193,12 +239,59 @@ export default function App() {
         const storedWeather = await AsyncStorage.getItem('cutecalendar_weather');
         if (storedWeather) setWeather(JSON.parse(storedWeather));
         refreshWeather();
+
+        // Load Account & Pro Membership Data
+        const storedUserStr = await AsyncStorage.getItem('cutecalendar_user_account');
+        if (storedUserStr) {
+          const userObj = JSON.parse(storedUserStr);
+          setUserAccount(userObj);
+          if (userObj.ownedStickers) setOwnedStickers(userObj.ownedStickers);
+          // Gói PRO gắn liền với từng tài khoản, mặc định 0 nếu tài khoản chưa kích hoạt/mua PRO
+          setProExpiresAt(Number(userObj.proExpiresAt) || 0);
+          setProTrialUsed(userObj.proTrialUsed === true);
+        } else {
+          setUserAccount(null);
+          setOwnedStickers([]);
+          setProExpiresAt(0);
+          setProTrialUsed(false);
+        }
+
+        // Dọn dẹp key toàn cục cũ để ngăn chặn rò rỉ trạng thái PRO sang tài khoản mới
+        await AsyncStorage.removeItem('cutecalendar_pro_expires').catch(() => {});
+        await AsyncStorage.removeItem('cutecalendar_pro_trial_used').catch(() => {});
+
+        // Gọi API lấy Stickers
+        fetchStickersApi().then((stks) => {
+          if (Array.isArray(stks) && stks.length > 0) setApiStickers(stks);
+        });
       } catch (e) {
         console.warn('Lỗi đọc AsyncStorage:', e);
       }
     };
     loadStoredData();
   }, [refreshWeather]);
+
+
+  // Quản lý cơ sở dữ liệu tài khoản cục bộ (User Database)
+  const saveUserToDb = async (user) => {
+    try {
+      const dbStr = await AsyncStorage.getItem('cutecalendar_users_db');
+      const db = dbStr ? JSON.parse(dbStr) : {};
+      db[user.phone] = user;
+      await AsyncStorage.setItem('cutecalendar_users_db', JSON.stringify(db));
+    } catch (e) {}
+  };
+
+  const getUserFromDb = async (phone) => {
+    try {
+      const dbStr = await AsyncStorage.getItem('cutecalendar_users_db');
+      if (!dbStr) return null;
+      const db = JSON.parse(dbStr);
+      return db[phone] || null;
+    } catch (e) {
+      return null;
+    }
+  };
 
   // Save Settings
   const toggleLanguage = async (newLang) => {
@@ -213,6 +306,143 @@ export default function App() {
     try {
       await AsyncStorage.setItem('cutecalendar_theme', themeKey);
     } catch (e) {}
+  };
+
+  // Auth Handlers (Đăng ký SĐT + Gmail, Đăng nhập, Đăng xuất)
+  const handleRegisterSuccess = async (newUser) => {
+    // Tài khoản mới đăng ký 100% bắt đầu ở cấp THÀNH VIÊN THƯỜNG (chưa kích hoạt PRO)
+    const freshUser = {
+      ...newUser,
+      proExpiresAt: 0,
+      proTrialUsed: false,
+    };
+    setUserAccount(freshUser);
+    setOwnedStickers(freshUser.ownedStickers || ['🌸', '🍓', '🐱']);
+    setProExpiresAt(0);
+    setProTrialUsed(false);
+    try {
+      await AsyncStorage.setItem('cutecalendar_user_account', JSON.stringify(freshUser));
+      await AsyncStorage.setItem('cutecalendar_owned_stickers', JSON.stringify(freshUser.ownedStickers));
+      await AsyncStorage.removeItem('cutecalendar_pro_expires');
+      await AsyncStorage.removeItem('cutecalendar_pro_trial_used');
+      await saveUserToDb(freshUser);
+      sendWelcomeAccountAlert({ phone: freshUser.phone, email: freshUser.email, stickers: freshUser.ownedStickers });
+    } catch (e) {}
+  };
+
+  const handleLoginSuccess = async ({ phone, password }) => {
+    const existing = await getUserFromDb(phone);
+    const account = existing || {
+      phone,
+      email: `${phone}@gmail.com`,
+      ownedStickers: ['🌸', '🍓', '🐱'],
+      registeredAt: Date.now(),
+      proExpiresAt: 0,
+      proTrialUsed: false,
+    };
+    setUserAccount(account);
+    setOwnedStickers(account.ownedStickers || ['🌸', '🍓', '🐱']);
+    setProExpiresAt(Number(account.proExpiresAt) || 0);
+    setProTrialUsed(account.proTrialUsed === true);
+    try {
+      await AsyncStorage.setItem('cutecalendar_user_account', JSON.stringify(account));
+      await AsyncStorage.setItem('cutecalendar_owned_stickers', JSON.stringify(account.ownedStickers || []));
+      await saveUserToDb(account);
+    } catch (e) {}
+    Alert.alert('Đăng nhập thành công', `Chào mừng ${phone} đã quay trở lại! 🌸`);
+  };
+
+  const handleLogout = async () => {
+    setUserAccount(null);
+    setOwnedStickers([]);
+    setProExpiresAt(0);
+    setProTrialUsed(false);
+    try {
+      await AsyncStorage.removeItem('cutecalendar_user_account');
+      await AsyncStorage.removeItem('cutecalendar_owned_stickers');
+      await AsyncStorage.removeItem('cutecalendar_pro_expires');
+      await AsyncStorage.removeItem('cutecalendar_pro_trial_used');
+    } catch (e) {}
+    Alert.alert('Đã đăng xuất', 'Bạn đang dùng tài khoản thường (chưa đăng ký).');
+  };
+
+  // Pyramid & Pro Membership Handlers
+  const handleClaimTrial = async () => {
+    const expires = Date.now() + 3 * 24 * 60 * 60 * 1000; // 3 ngày dùng thử
+    setProExpiresAt(expires);
+    setProTrialUsed(true);
+    setPyramidRewardModalVisible(false);
+
+    if (userAccount) {
+      const updatedUser = {
+        ...userAccount,
+        proExpiresAt: expires,
+        proTrialUsed: true,
+      };
+      setUserAccount(updatedUser);
+      try {
+        await AsyncStorage.setItem('cutecalendar_user_account', JSON.stringify(updatedUser));
+        await saveUserToDb(updatedUser);
+      } catch (e) {}
+    }
+
+    Alert.alert(
+      '👑 Kích hoạt Quà Tặng thành công!',
+      'Chúc mừng bạn nhận 3 ngày dùng thử Gói Thành viên PRO miễn phí! Đã tắt toàn bộ quảng cáo, mở full sticker và lặp lịch tự động.',
+    );
+  };
+
+  const handleUpgradeProPackage = async (packageType) => {
+    const days = packageType === '6months' ? 180 : 90;
+    const priceText = packageType === '6months' ? '150.000đ / 6 tháng' : '79.000đ / 3 tháng';
+    const expires = Date.now() + days * 24 * 60 * 60 * 1000;
+    setProExpiresAt(expires);
+    setPyramidRewardModalVisible(false);
+
+    if (userAccount) {
+      const updatedUser = {
+        ...userAccount,
+        proExpiresAt: expires,
+      };
+      setUserAccount(updatedUser);
+      try {
+        await AsyncStorage.setItem('cutecalendar_user_account', JSON.stringify(updatedUser));
+        await saveUserToDb(updatedUser);
+      } catch (e) {}
+    }
+
+    Alert.alert(
+      '👑 Nâng cấp Gói PRO Thành công!',
+      `Cảm ơn bạn đã đồng hành cùng CalendarCute với gói ${priceText}. Chúc bạn có những ngày lập kế hoạch thật đáng yêu! 💕`,
+    );
+  };
+
+
+  // Hủy gói PRO: đưa tài khoản về cấp Thành viên thường (giữ nguyên cờ đã dùng thử để không nhận lại quà)
+  const handleCancelPro = () => {
+    Alert.alert(
+      'Hủy gói PRO?',
+      'Bạn sẽ mất đặc quyền PRO (quảng cáo sẽ hiện lại, chỉ còn sticker đã sở hữu). Thời gian PRO còn lại sẽ không được hoàn lại.',
+      [
+        { text: 'Giữ gói PRO', style: 'cancel' },
+        {
+          text: 'Hủy gói PRO',
+          style: 'destructive',
+          onPress: async () => {
+            setProExpiresAt(0);
+            if (userAccount) {
+              const updatedUser = { ...userAccount, proExpiresAt: 0 };
+              setUserAccount(updatedUser);
+              try {
+                await AsyncStorage.setItem('cutecalendar_user_account', JSON.stringify(updatedUser));
+                await saveUserToDb(updatedUser);
+              } catch (e) {}
+            }
+            Alert.alert('Đã hủy gói PRO', 'Tài khoản của bạn đã trở về cấp Thành viên.');
+          },
+        },
+      ],
+    );
   };
 
   // Sticker Handlers
@@ -443,7 +673,8 @@ export default function App() {
   const navigateToTab = useCallback((tab) => {
     if (tab === activeTab || pendingTabRef.current !== null) return;
     const cooldownFinished = Date.now() - lastInterstitialShownRef.current >= CONFIG.INTERSTITIAL_COOLDOWN_MS;
-    if (!adsInitializedRef.current || !interstitialLoadedRef.current || !cooldownFinished) {
+    // BẢN THÀNH VIÊN PRO: HOÀN TOÀN KHÔNG HIỂN THỊ QUẢNG CÁO
+    if (isProUser || !adsInitializedRef.current || !interstitialLoadedRef.current || !cooldownFinished) {
       setActiveTab(tab);
       return;
     }
@@ -453,7 +684,8 @@ export default function App() {
       console.warn('Lỗi hiển thị quảng cáo:', adError);
       finishPendingNavigation();
     });
-  }, [activeTab, finishPendingNavigation, interstitial]);
+  }, [activeTab, finishPendingNavigation, interstitial, isProUser]);
+
 
   useEffect(() => {
     let active = true;
@@ -527,7 +759,11 @@ export default function App() {
     try {
       const data = await request();
       if (!Array.isArray(data)) throw new Error('Invalid MockAPI format');
-      setEvents(data.map(normalizeEvent));
+      const normalizedEvents = data.map(normalizeEvent);
+      setEvents(normalizedEvents);
+
+      // Thông báo chào buổi sáng nếu có lịch từ 06:00 đến 09:00
+      scheduleMorningGreeting(normalizedEvents);
     } catch (loadError) {
       setError(loadError.message || 'Cannot load events');
     } finally {
@@ -555,7 +791,7 @@ export default function App() {
     () => todos.filter((todo) => todo.date === dateKey(selectedDate)),
     [todos, selectedDate],
   );
-  const completedEventsCount = dayEvents.filter((event) => event.completed).length;
+  const completedEventsCount = events.filter((event) => event.completed).length;
 
   const monthDays = useMemo(() => {
     const first = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
@@ -588,6 +824,8 @@ export default function App() {
       category: 'work',
       description: '',
       sticker: '🌸',
+      repeat: 'none',
+      sendSmsEmail: false,
     });
     setEditorVisible(true);
   };
@@ -603,6 +841,8 @@ export default function App() {
       category: event.category,
       description: event.description,
       sticker: event.sticker || '🌸',
+      repeat: event.repeat || 'none',
+      sendSmsEmail: event.sendSmsEmail || false,
     });
     setEditorVisible(true);
   };
@@ -646,6 +886,8 @@ export default function App() {
       note: form.description.trim(),
       completed: editingEvent ? editingEvent.completed : false,
       sticker: form.sticker,
+      repeat: form.repeat || 'none',
+      sendSmsEmail: !!form.sendSmsEmail,
     };
     try {
       const saved = await request(editingEvent ? `/${editingEvent.id}` : '', {
@@ -662,6 +904,15 @@ export default function App() {
       setSelectedDate(new Date(`${payload.date}T12:00:00`));
       setEditorVisible(false);
       scheduleEventReminders(normalized);
+
+      // Gửi thông báo đến SMS và Gmail nếu được kích hoạt
+      if (form.sendSmsEmail) {
+        sendScheduleAlert({
+          event: normalized,
+          phone: userAccount?.phone,
+          email: userAccount?.email,
+        });
+      }
     } catch (saveError) {
       setError(saveError.message || 'Error saving');
       Alert.alert('Error', saveError.message || 'Please try again.');
@@ -677,11 +928,20 @@ export default function App() {
         method: 'PUT',
         body: JSON.stringify(updated),
       });
-      setEvents((current) => current.map((item) => String(item.id) === String(event.id) ? normalizeEvent(saved) : item));
+      const norm = normalizeEvent(saved);
+      const nextEvents = events.map((item) => String(item.id) === String(event.id) ? norm : item);
+      setEvents(nextEvents);
+
+      // Kiểm tra mốc 20 tầng Kim Tự Tháp
+      const completedTotal = nextEvents.filter((item) => item.completed).length;
+      if (completedTotal >= 20 && !proTrialUsed) {
+        setPyramidRewardModalVisible(true);
+      }
     } catch (toggleError) {
       Alert.alert('Error', 'Cannot update event');
     }
   };
+
 
   const deleteEvent = (event) => {
     Alert.alert(t.deleteEventTitle, t.deleteEventMsg(event.title), [
@@ -705,6 +965,7 @@ export default function App() {
   const selectedDateStr = dateKey(selectedDate);
   const selectedDateMood = moodsMap[selectedDateStr];
   const selectedDateSticker = stickersMap[selectedDateStr];
+  const isBannerActive = !isProUser && adsInitialized && bottomBannerVisible;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -721,24 +982,12 @@ export default function App() {
           selectedDateMood={selectedDateMood}
           onPressSticker={() => setStickerPickerVisible(true)}
           onPressProfile={() => navigateToTab('profile')}
+          isProUser={isProUser}
+          accountRole={accountRole}
+          onPressAuth={() => setAuthModalVisible(true)}
+          onPressPro={() => setPyramidRewardModalVisible(true)}
         />
 
-        {/* --- GOOGLE AD BANNER --- */}
-        {adsInitialized && topBannerVisible ? (
-          <View style={[styles.topBannerContainer, { backgroundColor: theme.surface, borderBottomColor: theme.line }]}>
-            <BannerAd
-              unitId={CONFIG.BANNER_AD_UNIT_ID}
-              size={BannerAdSize.BANNER}
-              requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-            />
-            <Pressable
-              style={styles.topBannerCloseButton}
-              onPress={() => setTopBannerVisible(false)}
-            >
-              <Ionicons name="close-circle" size={19} color={theme.muted} />
-            </Pressable>
-          </View>
-        ) : null}
 
         {/* --- BODY SCROLLVIEW --- */}
         <ScrollView
@@ -845,6 +1094,9 @@ export default function App() {
               events={events}
               moodsMap={moodsMap}
               completedEventsCount={completedEventsCount}
+              onPressGift={() => setPyramidRewardModalVisible(true)}
+              isProUser={isProUser}
+              proDaysLeft={proDaysLeft}
             />
           )}
 
@@ -857,17 +1109,35 @@ export default function App() {
               onToggleLang={toggleLanguage}
               onSaveTheme={saveTheme}
               onRefreshData={() => loadEvents()}
+              userAccount={userAccount}
+              isProUser={isProUser}
+              accountRole={accountRole}
+              proDaysLeft={proDaysLeft}
+              ownedStickers={effectiveOwnedStickers}
+              onOpenAuthModal={() => setAuthModalVisible(true)}
+              onOpenProModal={() => setPyramidRewardModalVisible(true)}
+              onCancelPro={handleCancelPro}
+              onLogout={handleLogout}
+              bottomBannerVisible={bottomBannerVisible}
+              onShowBanner={() => setBottomBannerVisible(true)}
             />
           )}
 
-          <View style={{ height: 90 }} />
+          <View style={{ height: isBannerActive ? 160 : 90 }} />
         </ScrollView>
 
         {/* --- FLOATING ACTION BUTTON (FAB) --- */}
         {activeTab !== 'profile' && activeTab !== 'insights' ? (
           <Pressable
             accessibilityLabel={t.fabAddText}
-            style={[styles.fab, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
+            style={[
+              styles.fab,
+              {
+                backgroundColor: theme.primary,
+                shadowColor: theme.primary,
+                bottom: isBannerActive ? 152 : 82,
+              },
+            ]}
             onPress={openNewEvent}
           >
             <Ionicons name="add" size={26} color="#fff" />
@@ -883,6 +1153,41 @@ export default function App() {
           onNavigateTab={navigateToTab}
           disabled={navigationPending}
         />
+
+        {/* --- GOOGLE AD BANNER (ĐẶT Ở DƯỚI CÙNG THEO CHÍNH SÁCH GOOGLE ADMOB) --- */}
+        {isBannerActive ? (
+          <View style={[styles.bottomBannerContainer, { backgroundColor: theme.surface, borderTopColor: theme.line }]}>
+            <View style={styles.bannerHeader}>
+              <View style={styles.bannerBadge}>
+                <Ionicons name="megaphone-outline" size={11} color={theme.muted} />
+                <Text style={[styles.bannerBadgeText, { color: theme.muted }]}>
+                  {lang === 'vi' ? 'Quảng cáo' : 'Ad'}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setBottomBannerVisible(false)}
+                style={({ pressed }) => [
+                  styles.bannerCloseBtn,
+                  { backgroundColor: theme.line },
+                  pressed && { opacity: 0.6 },
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={lang === 'vi' ? 'Tắt quảng cáo' : 'Close ad'}
+              >
+                <Ionicons name="close" size={13} color={theme.ink} />
+                <Text style={[styles.bannerCloseText, { color: theme.ink }]}>
+                  {lang === 'vi' ? 'Tắt' : 'Close'}
+                </Text>
+              </Pressable>
+            </View>
+            <BannerAd
+              unitId={CONFIG.BANNER_AD_UNIT_ID}
+              size={BannerAdSize.BANNER}
+              requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+            />
+          </View>
+        ) : null}
       </View>
 
       {/* --- ALL MODALS --- */}
@@ -893,9 +1198,15 @@ export default function App() {
         t={t}
         selectedDateStr={selectedDateStr}
         selectedDateSticker={selectedDateSticker}
+        stickers={apiStickers}
+        isProUser={isProUser}
+        accountRole={accountRole}
+        ownedStickers={effectiveOwnedStickers}
         onClose={() => setStickerPickerVisible(false)}
         onSelectSticker={handleSelectSticker}
         onRemoveSticker={handleRemoveSticker}
+        onOpenProModal={() => setPyramidRewardModalVisible(true)}
+        onOpenAuthModal={() => setAuthModalVisible(true)}
       />
 
       <MoodModal
@@ -967,7 +1278,42 @@ export default function App() {
         updateFormFromPicker={updateFormFromPicker}
         onClose={() => setEditorVisible(false)}
         onSaveEvent={saveEvent}
+        isProUser={isProUser}
+        accountRole={accountRole}
+        ownedStickers={effectiveOwnedStickers}
+        allStickers={apiStickers}
+        userAccount={userAccount}
+        onOpenProModal={() => setPyramidRewardModalVisible(true)}
+        onOpenAuthModal={() => setAuthModalVisible(true)}
       />
+
+      {/* --- AUTH MODAL (Đăng ký SĐT + Gmail, Đăng nhập) --- */}
+      <AuthModal
+        visible={authModalVisible}
+        theme={theme}
+        t={t}
+        allStickers={apiStickers}
+        onRegisterSuccess={handleRegisterSuccess}
+        onLoginSuccess={handleLoginSuccess}
+        onClose={() => setAuthModalVisible(false)}
+      />
+
+      {/* --- PYRAMID REWARD & PRO PACKAGES MODAL --- */}
+      <PyramidRewardModal
+        visible={pyramidRewardModalVisible}
+        theme={theme}
+        t={t}
+        completedCount={completedEventsCount}
+        isProUser={isProUser}
+        accountRole={accountRole}
+        proTrialUsed={proTrialUsed}
+        onClaimTrial={handleClaimTrial}
+        onUpgradeProPackage={handleUpgradeProPackage}
+        onOpenAuthModal={() => setAuthModalVisible(true)}
+        onClose={() => setPyramidRewardModalVisible(false)}
+      />
+
+
     </SafeAreaView>
   );
 }
@@ -980,22 +1326,46 @@ const styles = StyleSheet.create({
   app: { flex: 1 },
   content: { flex: 1 },
   contentContainer: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 24 },
-  topBannerContainer: {
+  bottomBannerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  bannerHeader: {
+    width: '100%',
+    maxWidth: 320,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    paddingVertical: 2,
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingBottom: 4,
   },
-  topBannerCloseButton: {
-    position: 'absolute',
-    right: 4,
-    top: 2,
-    width: 24,
-    height: 24,
+  bannerBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
+  bannerBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
+  },
+  bannerCloseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 10,
+  },
+  bannerCloseText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
   fab: {
     position: 'absolute',
     bottom: 85,

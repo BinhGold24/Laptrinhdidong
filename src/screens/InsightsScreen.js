@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MOOD_KEYS, CATEGORY_KEYS } from '../constants/data';
+import PyramidView from '../components/PyramidView';
 
 export default function InsightsScreen({
   theme,
@@ -9,11 +10,24 @@ export default function InsightsScreen({
   events,
   moodsMap,
   completedEventsCount,
+  onPressGift,
+  isProUser = false,
+  proDaysLeft = 0,
 }) {
   return (
     <View>
       <Text style={[styles.greeting, { color: theme.ink }]}>{t.insightsTitle}</Text>
       <Text style={[styles.subtitle, { color: theme.muted }]}>{t.insightsSub}</Text>
+
+      {/* Kim Tự Tháp 20 Tầng Lịch Trình Lưu Trữ */}
+      <PyramidView
+        theme={theme}
+        t={t}
+        completedCount={completedEventsCount}
+        onPressGift={onPressGift}
+        isProUser={isProUser}
+        proDaysLeft={proDaysLeft}
+      />
 
       {/* Big Recap Hero */}
       <View style={[styles.insightHero, { backgroundColor: theme.primaryLight, borderColor: theme.border }]}>
@@ -28,6 +42,7 @@ export default function InsightsScreen({
             : t.insightsEncouragement}
         </Text>
       </View>
+
 
       {/* Mood breakdown */}
       <View style={[styles.sectionWrap, { marginTop: 22 }]}>

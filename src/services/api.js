@@ -27,3 +27,35 @@ export async function request(path = '', options = {}) {
   if (response.status === 204) return null;
   return response.json();
 }
+
+/**
+ * Gọi API lấy danh sách stickers (với cache offline và fallback)
+ */
+export async function fetchStickersApi() {
+  try {
+    // Thử gọi endpoint stickers từ MockAPI (nếu có endpoint /stickers)
+    const response = await fetch('https://6ae09edfbe3bc8fead979650.mockapi.io/api/v1/stickers', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const stickers = data.map((item) => (typeof item === 'string' ? item : item.emoji || item.sticker || '🌸'));
+        return stickers;
+      }
+    }
+  } catch (err) {
+    console.log('API stickers error, using fallback/cached stickers:', err.message);
+  }
+
+  // Fallback danh sách sticker kawaii phong phú
+  const defaultStickers = [
+    '🌸', '🍓', '🐱', '☕', '🎂', '🧸', '🥑', '🎀',
+    '✈️', '💖', '⭐️', '☀️', '🌧', '🎵', '📚', '🍕',
+    '🍦', '🎨', '🌿', '🍿', '🐶', '🐰', '🐼', '🌻',
+    '🌙', '🫧', '🧋', '💌', '🥞', '🍩', '🎯', '💫',
+    '🍒', '🍉', '🐣', '🦄', '🧁', '🌷', '🍬', '🍡'
+  ];
+  return defaultStickers;
+}
+

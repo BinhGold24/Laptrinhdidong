@@ -6,6 +6,7 @@
   "scripts": {
     "start": "expo start --metro-port 8082",
     "android": "expo run:android --port 8082",
+    "android:release": "expo run:android --variant release",
     "ios": "expo run:ios"
   },
   "dependencies": {
