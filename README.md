@@ -50,7 +50,7 @@ Các giá trị `category`: `work`, `personal`, `health`, `other`. Tài nguyên 
 - Báo lỗi kết nối/lưu dữ liệu và cho phép tải lại từ MockAPI.
 
 
-
+[link figma](https://www.figma.com/design/tC51yX9YnwXE2oRdsPQJhD/Untitled?node-id=0-1&p=f&t=Y47ybN22VAC4om2W-0)
 
 
 
