@@ -1,5 +1,8 @@
 import { CONFIG, CATEGORY_KEYS } from '../constants/data';
-import { dateKey } from '../utils/dateUtils';
+import { dateKey, clampRemindMinutes } from '../utils/dateUtils';
+import { fetchWithTimeout } from '../utils/fetchUtils';
+
+let cachedStickersResult = null;
 
 export function normalizeEvent(event) {
   return {
@@ -12,14 +15,17 @@ export function normalizeEvent(event) {
     description: String(event.description || event.note || ''),
     completed: event.completed === true || event.completed === 'true',
     sticker: event.sticker || '',
+    userId: String(event.userId || event.userPhone || ''),
+    repeat: event.repeat || 'none',
+    remindBeforeMinutes: clampRemindMinutes(event.remindBeforeMinutes ?? event.remindBefore ?? 0),
   };
 }
 
 export async function request(path = '', options = {}) {
-  const response = await fetch(`${CONFIG.API_URL}${path}`, {
+  const response = await fetchWithTimeout(`${CONFIG.API_URL}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options.headers },
-  });
+  }, 6000);
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`MockAPI error ${response.status}${detail ? `: ${detail}` : ''}`);
@@ -29,19 +35,20 @@ export async function request(path = '', options = {}) {
 }
 
 /**
- * Gọi API lấy danh sách stickers (với cache offline và fallback)
+ * Gọi API lấy danh sách stickers (với cache trong RAM & timeout nhanh)
  */
 export async function fetchStickersApi() {
+  if (cachedStickersResult) return cachedStickersResult;
   try {
     // Thử gọi endpoint stickers từ MockAPI (nếu có endpoint /stickers)
-    const response = await fetch('https://6ae09edfbe3bc8fead979650.mockapi.io/api/v1/stickers', {
+    const response = await fetchWithTimeout('https://6ae09edfbe3bc8fead979650.mockapi.io/api/v1/stickers', {
       headers: { 'Content-Type': 'application/json' },
-    });
+    }, 3500);
     if (response.ok) {
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
-        const stickers = data.map((item) => (typeof item === 'string' ? item : item.emoji || item.sticker || '🌸'));
-        return stickers;
+        cachedStickersResult = data.map((item) => (typeof item === 'string' ? item : item.emoji || item.sticker || '🌸'));
+        return cachedStickersResult;
       }
     }
   } catch (err) {
@@ -49,13 +56,13 @@ export async function fetchStickersApi() {
   }
 
   // Fallback danh sách sticker kawaii phong phú
-  const defaultStickers = [
+  cachedStickersResult = [
     '🌸', '🍓', '🐱', '☕', '🎂', '🧸', '🥑', '🎀',
     '✈️', '💖', '⭐️', '☀️', '🌧', '🎵', '📚', '🍕',
     '🍦', '🎨', '🌿', '🍿', '🐶', '🐰', '🐼', '🌻',
     '🌙', '🫧', '🧋', '💌', '🥞', '🍩', '🎯', '💫',
     '🍒', '🍉', '🐣', '🦄', '🧁', '🌷', '🍬', '🍡'
   ];
-  return defaultStickers;
+  return cachedStickersResult;
 }
 

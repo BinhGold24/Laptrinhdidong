@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CategoryBadge } from './CategoryPickerRow';
+import { resolveItemCategory } from '../utils/categoryUtils';
 
-export default function TodoSection({
+export default React.memo(function TodoSection({
   theme,
   t,
   dayTodos,
@@ -14,7 +16,7 @@ export default function TodoSection({
   return (
     <View style={styles.sectionWrap}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: theme.ink }]}>{t.todoSectionTitle}</Text>
+        <Text style={[styles.sectionTitle, { color: theme.ink, flex: 1, paddingRight: 8 }]}>{t.todoSectionTitle}</Text>
         <Pressable onPress={onOpenAdd}>
           <Text style={[styles.sectionActionText, { color: theme.primary }]}>{t.newTodoBtn}</Text>
         </Pressable>
@@ -31,7 +33,7 @@ export default function TodoSection({
                   color={tItem.completed ? theme.green : theme.muted}
                 />
               </Pressable>
-              <Pressable style={{ flex: 1 }} onPress={() => onEdit(tItem)}>
+              <Pressable style={{ flex: 1, gap: 4 }} onPress={() => onEdit(tItem)}>
                 <Text
                   style={[
                     styles.todoTitle,
@@ -41,6 +43,12 @@ export default function TodoSection({
                 >
                   {tItem.title}
                 </Text>
+                <CategoryBadge
+                  categoryKey={resolveItemCategory(tItem)}
+                  t={t}
+                  theme={theme}
+                  compact
+                />
               </Pressable>
               <Pressable onPress={() => onEdit(tItem)} style={{ padding: 5, marginRight: 4 }}>
                 <Ionicons name="pencil-outline" size={16} color={theme.muted} />
@@ -61,7 +69,7 @@ export default function TodoSection({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   sectionWrap: { marginBottom: 18 },

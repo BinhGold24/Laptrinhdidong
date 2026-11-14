@@ -1,23 +1,39 @@
-export async function fetchRealWeather() {
+import { fetchWithTimeout } from '../utils/fetchUtils';
+
+let cachedGeo = null;
+let cachedWeather = null;
+let cachedWeatherAt = 0;
+const WEATHER_TTL_MS = 5 * 60 * 1000;
+
+export async function fetchRealWeather(force = false) {
+  if (!force && cachedWeather && Date.now() - cachedWeatherAt < WEATHER_TTL_MS) {
+    return cachedWeather;
+  }
+
   try {
-    let lat = 21.0285;
-    let lon = 105.8542;
-    let city = 'Hà Nội';
+    let lat = cachedGeo?.lat ?? 21.0285;
+    let lon = cachedGeo?.lon ?? 105.8542;
+    let city = cachedGeo?.city ?? 'Hà Nội';
 
-    try {
-      const geoRes = await fetch('https://get.geojs.io/v1/ip/geo.json');
-      if (geoRes.ok) {
-        const geoData = await geoRes.json();
-        if (geoData.latitude && geoData.longitude) {
-          lat = Number(geoData.latitude);
-          lon = Number(geoData.longitude);
-          city = geoData.city || geoData.region || 'Việt Nam';
+    if (!cachedGeo) {
+      try {
+        const geoRes = await fetchWithTimeout('https://get.geojs.io/v1/ip/geo.json', {}, 4000);
+        if (geoRes.ok) {
+          const geoData = await geoRes.json();
+          if (geoData.latitude && geoData.longitude) {
+            lat = Number(geoData.latitude);
+            lon = Number(geoData.longitude);
+            city = geoData.city || geoData.region || 'Việt Nam';
+            cachedGeo = { lat, lon, city };
+          }
         }
-      }
-    } catch (geoErr) {}
+      } catch (geoErr) {}
+    }
 
-    const weatherRes = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`
+    const weatherRes = await fetchWithTimeout(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`,
+      {},
+      4500
     );
     if (!weatherRes.ok) return null;
 
@@ -62,13 +78,15 @@ export async function fetchRealWeather() {
       descEn = 'Thunderstorm';
     }
 
-    return {
+    cachedWeather = {
       temp,
       icon,
       city,
       descVi,
       descEn,
     };
+    cachedWeatherAt = Date.now();
+    return cachedWeather;
   } catch (err) {
     console.warn('Lỗi lấy thời tiết:', err);
     return null;

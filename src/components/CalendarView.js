@@ -4,7 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { dateKey } from '../utils/dateUtils';
 import { MOOD_KEYS } from '../constants/data';
 
-export default function CalendarView({
+const MOOD_EMOJI_MAP = Object.fromEntries(MOOD_KEYS.map((m) => [m.key, m.emoji]));
+
+function CalendarView({
   theme,
   t,
   selectedDate,
@@ -19,6 +21,13 @@ export default function CalendarView({
   onSelectDate,
   onSelectToday,
 }) {
+  const eventDatesSet = React.useMemo(() => new Set(events.map((e) => e.date)), [events]);
+  const todayKey = dateKey(new Date());
+  const selectedKey = dateKey(selectedDate);
+  const selectedYear = selectedDate.getFullYear();
+  const selectedMonth = selectedDate.getMonth();
+  const selectedDay = selectedDate.getDate();
+
   return (
     <View style={[styles.calendarCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <View style={styles.monthHeader}>
@@ -68,9 +77,9 @@ export default function CalendarView({
         <View style={styles.weekDates}>
           {week.map((day) => {
             const dKey = dateKey(day);
-            const selected = dKey === dateKey(selectedDate);
-            const today = dKey === dateKey(new Date());
-            const hasEvent = events.some((event) => event.date === dKey);
+            const selected = dKey === selectedKey;
+            const today = dKey === todayKey;
+            const hasEvent = eventDatesSet.has(dKey);
             const sticker = stickersMap[dKey];
             return (
               <Pressable
@@ -108,11 +117,11 @@ export default function CalendarView({
             if (!day) {
               return <View key={`blank-${index}`} style={styles.monthDay} />;
             }
-            const dateObj = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+            const dateObj = new Date(selectedYear, selectedMonth, day);
             const dKey = dateKey(dateObj);
-            const selected = day === selectedDate.getDate();
-            const today = dKey === dateKey(new Date());
-            const hasEvent = events.some((event) => event.date === dKey);
+            const selected = day === selectedDay;
+            const today = dKey === todayKey;
+            const hasEvent = eventDatesSet.has(dKey);
             const sticker = stickersMap[dKey];
             const mood = moodsMap[dKey];
             return (
@@ -142,7 +151,7 @@ export default function CalendarView({
                   <Text style={{ fontSize: 11 }}>{sticker}</Text>
                 ) : mood ? (
                   <Text style={{ fontSize: 10 }}>
-                    {MOOD_KEYS.find((m) => m.key === mood.key)?.emoji || '🌸'}
+                    {MOOD_EMOJI_MAP[mood.key] || '🌸'}
                   </Text>
                 ) : hasEvent ? (
                   <View style={[styles.monthIndicator, { backgroundColor: theme.primary }]} />
@@ -155,6 +164,8 @@ export default function CalendarView({
     </View>
   );
 }
+
+export default React.memo(CalendarView);
 
 const styles = StyleSheet.create({
   calendarCard: {

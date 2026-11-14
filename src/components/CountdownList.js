@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { calculateDDay, dateLabel } from '../utils/dateUtils';
+import { calculateDDay, dateLabel, localizeText } from '../utils/dateUtils';
 
 export default function CountdownList({
   theme,
@@ -15,7 +15,7 @@ export default function CountdownList({
   return (
     <View style={styles.sectionWrap}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: theme.ink }]}>{t.ddaySectionTitle}</Text>
+        <Text style={[styles.sectionTitle, { color: theme.ink, flex: 1, paddingRight: 8 }]}>{t.ddaySectionTitle}</Text>
         <Pressable onPress={onOpenAdd}>
           <Text style={[styles.sectionActionText, { color: theme.primary }]}>{t.addBtn}</Text>
         </Pressable>
@@ -31,7 +31,7 @@ export default function CountdownList({
               <Text style={{ fontSize: 20 }}>{item.icon}</Text>
             </View>
             <View style={{ flex: 1, paddingRight: 6 }}>
-              <Text style={[styles.ddayTitle, { color: theme.ink }]} numberOfLines={1}>{item.title}</Text>
+              <Text style={[styles.ddayTitle, { color: theme.ink }]} numberOfLines={1}>{localizeText(item.title, lang)}</Text>
               <Text style={[styles.ddayDate, { color: theme.muted }]}>{dateLabel(item.targetDate, lang)}</Text>
             </View>
             <View style={[styles.ddayBadge, { backgroundColor: theme.primary }]}>
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
   sectionActionText: { fontSize: 12, fontWeight: '700' },
   ddayCard: {
-    width: 170,
+    width: 215,
     borderRadius: 18,
     borderWidth: 1,
     padding: 12,

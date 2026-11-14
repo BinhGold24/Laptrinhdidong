@@ -123,7 +123,7 @@ export default function PyramidView({
         style={[
           styles.rewardBanner,
           {
-            backgroundColor: isFull ? '#FFF8E7' : theme.primaryLight,
+            backgroundColor: isFull ? (theme.isDark ? '#3A301C' : '#FFF8E7') : theme.primaryLight,
             borderColor: isFull ? '#FFD166' : theme.primary,
           },
         ]}
@@ -165,12 +165,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  headerLeft: { flex: 1 },
-  title: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
+  headerLeft: { flex: 1, paddingRight: 8 },
+  title: { fontSize: 15.5, fontWeight: '800', letterSpacing: -0.3 },
   subtitle: { fontSize: 11, marginTop: 2 },
   giftButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,

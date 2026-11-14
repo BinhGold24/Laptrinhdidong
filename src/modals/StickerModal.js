@@ -62,15 +62,15 @@ export default function StickerModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.modalTitle, { color: theme.ink }]}>{t.modalStickerTitle}</Text>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                <Text style={[styles.modalTitle, { color: theme.ink, flexShrink: 1 }]}>{t.modalStickerTitle}</Text>
                 {accountRole === 'pro' && (
                   <View style={[styles.proBadge, { backgroundColor: '#FFD700' }]}>
                     <Text style={styles.proBadgeText}>👑 PRO VIP FULL</Text>
@@ -157,9 +157,9 @@ const styles = StyleSheet.create({
   },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#D6D0DA', alignSelf: 'center', marginBottom: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: '800' },
+  modalTitle: { fontSize: 18, fontWeight: '800' },
   modalSubtitle: { fontSize: 11, marginTop: 3 },
-  closeButton: { width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  closeButton: { width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   stickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', paddingVertical: 10 },
   stickerCell: {
     width: 62,

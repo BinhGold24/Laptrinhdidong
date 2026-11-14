@@ -1,9 +1,13 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { localizeText } from '../utils/dateUtils';
+import { CategoryBadge } from './CategoryPickerRow';
+import { resolveItemCategory } from '../utils/categoryUtils';
 
-export default function HabitSection({
+export default React.memo(function HabitSection({
   theme,
+  lang = 'vi',
   t,
   habits,
   selectedDateStr,
@@ -15,7 +19,7 @@ export default function HabitSection({
   return (
     <View style={styles.sectionWrap}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: theme.ink }]}>{t.habitsSectionTitle}</Text>
+        <Text style={[styles.sectionTitle, { color: theme.ink, flex: 1, paddingRight: 8 }]}>{t.habitsSectionTitle}</Text>
         <Pressable onPress={onOpenAdd}>
           <Text style={[styles.sectionActionText, { color: theme.primary }]}>{t.createHabitBtn}</Text>
         </Pressable>
@@ -40,19 +44,27 @@ export default function HabitSection({
                 onPress={() => onToggle(h.id)}
                 style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}
               >
-                <View style={[styles.habitIconBox, { backgroundColor: isDone ? theme.primary : '#F5F3F8' }]}>
+                <View style={[styles.habitIconBox, { backgroundColor: isDone ? theme.primary : (theme.isDark ? '#2A2533' : '#F5F3F8') }]}>
                   <Text style={{ fontSize: 16 }}>{h.icon}</Text>
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, gap: 3 }}>
                   <Text
                     style={[styles.habitTitle, { color: theme.ink }, isDone && { fontWeight: '700' }]}
                     numberOfLines={1}
                   >
-                    {h.title}
+                    {localizeText(h.title, lang)}
                   </Text>
-                  <Text style={[styles.habitStreak, { color: isDone ? theme.primary : theme.muted }]}>
-                    {isDone ? t.completedHabit : t.streakDays(streakCount)}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <CategoryBadge
+                      categoryKey={resolveItemCategory(h)}
+                      t={t}
+                      theme={theme}
+                      compact
+                    />
+                    <Text style={[styles.habitStreak, { color: isDone ? theme.primary : theme.muted, marginTop: 0 }]}>
+                      {isDone ? t.completedHabit : t.streakDays(streakCount)}
+                    </Text>
+                  </View>
                 </View>
                 <Ionicons
                   name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
@@ -72,7 +84,7 @@ export default function HabitSection({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   sectionWrap: { marginBottom: 18 },

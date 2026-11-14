@@ -5,7 +5,7 @@ import CalendarView from '../components/CalendarView';
 import EventCard from '../components/EventCard';
 import { dateLabel } from '../utils/dateUtils';
 
-export default function CalendarScreen({
+export default React.memo(function CalendarScreen({
   theme,
   lang,
   t,
@@ -49,14 +49,14 @@ export default function CalendarScreen({
 
       {/* Day Quick Sticker Bar */}
       <View style={[styles.dateStickerBar, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, paddingRight: 10 }}>
           <Text style={[styles.dateStickerTitle, { color: theme.ink }]}>
             {dateLabel(selectedDateStr, lang)} {selectedDateSticker ? `· Sticker: ${selectedDateSticker}` : ''}
           </Text>
           <Text style={[styles.dateStickerSub, { color: theme.muted }]}>{t.stickerSub}</Text>
         </View>
         <Pressable
-          style={[styles.stickerPickBtn, { backgroundColor: theme.primaryLight }]}
+          style={[styles.stickerPickBtn, { backgroundColor: theme.primaryLight, flexShrink: 0 }]}
           onPress={onOpenStickerPicker}
         >
           <Text style={{ fontSize: 16 }}>{selectedDateSticker || '🌸'}</Text>
@@ -66,26 +66,24 @@ export default function CalendarScreen({
 
       {/* Day's Agenda */}
       <View style={styles.agendaHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.ink }]}>{t.calendarAgendaTitle}</Text>
+        <Text style={[styles.sectionTitle, { color: theme.ink, flex: 1, paddingRight: 8 }]}>{t.calendarAgendaTitle}</Text>
         <Text style={[styles.agendaDate, { color: theme.muted }]}>{t.itemsCount(dayEvents.length)}</Text>
       </View>
 
       {dayEvents.length ? (
-        <FlatList
-          data={dayEvents}
-          renderItem={({ item }) => (
+        <View style={{ gap: 10 }}>
+          {dayEvents.map((item, index) => (
             <EventCard
+              key={String(item.id || index)}
               theme={theme}
+              t={t}
               event={item}
               onToggle={onToggleEvent}
               onEdit={onEditEvent}
               onDelete={onDeleteEvent}
             />
-          )}
-          keyExtractor={(item, index) => String(item.id || index)}
-          scrollEnabled={false}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        />
+          ))}
+        </View>
       ) : (
         <View
           style={[
@@ -106,7 +104,7 @@ export default function CalendarScreen({
       )}
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   dateStickerBar: {

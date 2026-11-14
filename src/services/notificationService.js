@@ -1,7 +1,13 @@
-import { Platform, Linking, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { CONFIG } from '../constants/data';
-import { dateKey, parseDateTime, isValidTime } from '../utils/dateUtils';
+import {
+  dateKey,
+  parseDateTime,
+  isValidTime,
+  clampRemindMinutes,
+  getRemindBeforeDate,
+} from '../utils/dateUtils';
 
 export function setupNotifications() {
   Notifications.setNotificationHandler({
@@ -17,7 +23,7 @@ export function setupNotifications() {
 export async function requestNotificationPermission() {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CONFIG.REMINDER_CHANNEL_ID, {
-      name: 'Nhắc lịch trình / Reminders',
+      name: 'Nhắc lịch trình',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF7E95',
@@ -43,7 +49,49 @@ export async function cancelReminders(reminders) {
   );
 }
 
-export async function scheduleEventReminders(event) {
+function buildReminderCandidates(event, lang = 'vi') {
+  const isEn = lang === 'en';
+  const startDate = parseDateTime(event.date, event.time);
+  const remindBeforeMinutes = clampRemindMinutes(event.remindBeforeMinutes ?? event.remindBefore ?? 0);
+  const candidates = [];
+
+  if (remindBeforeMinutes > 0) {
+    candidates.push({
+      type: 'before',
+      date: getRemindBeforeDate(event.date, event.time, remindBeforeMinutes),
+      title: isEn
+        ? `⏰ Upcoming in ${remindBeforeMinutes} min: ${event.title}`
+        : `⏰ Sắp tới lịch (còn ${remindBeforeMinutes} phút): ${event.title}`,
+      body: isEn
+        ? `"${event.title}" starts at ${event.time}. Get ready! 🌸`
+        : `Còn ${remindBeforeMinutes} phút nữa đến giờ "${event.title}" (lúc ${event.time}). Chuẩn bị ngay nhé! 🌸`,
+    });
+  }
+
+  candidates.push({
+    type: 'start',
+    date: startDate,
+    title: `🌸 ${event.title}`,
+    body: isEn
+      ? `It is time to start your schedule (${event.time}).`
+      : `Đã đến giờ bắt đầu lịch trình (${event.time}).`,
+  });
+
+  if (event.endTime) {
+    candidates.push({
+      type: 'end',
+      date: parseDateTime(event.date, event.endTime),
+      title: `🌸 ${event.title}`,
+      body: isEn
+        ? `Your scheduled event has ended (${event.endTime}).`
+        : `Đã đến giờ kết thúc lịch trình (${event.endTime}).`,
+    });
+  }
+
+  return { candidates, remindBeforeMinutes };
+}
+
+export async function scheduleEventReminders(event, lang = 'vi') {
   if (event.id == null) return 0;
   if (
     dateKey(parseDateTime(event.date)) !== event.date ||
@@ -55,16 +103,15 @@ export async function scheduleEventReminders(event) {
 
   const eventId = String(event.id);
   const previousReminders = await getEventReminders(eventId);
+
+  if (event.completed) {
+    await cancelReminders(previousReminders);
+    return 0;
+  }
+
   const now = new Date();
-  const candidates = [
-    { type: 'start', time: event.time, body: 'Đã đến giờ bắt đầu lịch trình / It is time to start.' },
-    ...(event.endTime
-      ? [{ type: 'end', time: event.endTime, body: 'Đã đến giờ kết thúc lịch trình / Event has ended.' }]
-      : []),
-  ].map((reminder) => ({
-    ...reminder,
-    date: parseDateTime(event.date, reminder.time),
-  })).filter((reminder) => reminder.date > now);
+  const { candidates: allCandidates, remindBeforeMinutes } = buildReminderCandidates(event, lang);
+  const candidates = allCandidates.filter((reminder) => reminder.date > now);
 
   if (!candidates.length) {
     await cancelReminders(previousReminders);
@@ -80,10 +127,10 @@ export async function scheduleEventReminders(event) {
     for (const reminder of candidates) {
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
-          title: `🌸 ${event.title}`,
+          title: reminder.title,
           body: reminder.body,
           sound: 'default',
-          data: { eventId, reminderType: reminder.type },
+          data: { eventId, reminderType: reminder.type, remindBeforeMinutes },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -97,6 +144,7 @@ export async function scheduleEventReminders(event) {
     await Promise.all(
       scheduledIds.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)),
     );
+    return 0;
   }
 
   try {
@@ -105,6 +153,50 @@ export async function scheduleEventReminders(event) {
 
   return candidates.length;
 }
+
+/**
+ * Đồng bộ lại thông báo cho các lịch trình sắp tới (chỉ chạy âm thầm nếu quyền thông báo đã được cấp)
+ */
+export async function syncUpcomingEventReminders(events = [], lang = 'vi') {
+  if (!Array.isArray(events) || events.length === 0) return;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return;
+
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const scheduledKeys = new Set(
+      scheduled.map((n) => {
+        const d = n.content?.data || {};
+        return `${String(d.eventId)}_${d.reminderType}_${d.remindBeforeMinutes ?? ''}`;
+      }),
+    );
+
+    const now = new Date();
+    for (const ev of events) {
+      if (!ev || ev.id == null || ev.completed) continue;
+      if (
+        dateKey(parseDateTime(ev.date)) !== ev.date ||
+        !isValidTime(ev.time) ||
+        (ev.endTime && !isValidTime(ev.endTime))
+      ) {
+        continue;
+      }
+
+      const { candidates, remindBeforeMinutes } = buildReminderCandidates(ev, lang);
+      const upcoming = candidates.filter((c) => c.date > now);
+      if (!upcoming.length) continue;
+
+      const missingAny = upcoming.some(
+        (c) => !scheduledKeys.has(`${String(ev.id)}_${c.type}_${remindBeforeMinutes}`),
+      );
+      if (missingAny) {
+        await scheduleEventReminders(ev, lang);
+      }
+    }
+  } catch (e) {}
+}
+
+let lastMorningGreetingKey = '';
 
 /**
  * Lên lịch thông báo Chào buổi sáng nếu người dùng có lịch trình từ 06:00 đến 09:00
@@ -124,6 +216,9 @@ export async function scheduleMorningGreeting(events = []) {
   if (morningEvents.length === 0) return;
 
   const firstEvent = morningEvents[0];
+  const greetingKey = `${todayStr}_${firstEvent.id}`;
+  if (lastMorningGreetingKey === greetingKey) return;
+  lastMorningGreetingKey = greetingKey;
   const hasPermission = await requestNotificationPermission();
   if (!hasPermission) return;
 
@@ -166,214 +261,9 @@ export async function scheduleMorningGreeting(events = []) {
 }
 
 /**
- * CẤU HÌNH CỔNG GỬI SMS & EMAIL THỰC TẾ
- * Khi bạn có tài khoản nhà cung cấp SMS (eSMS.vn, SpeedSMS.vn, Twilio):
- * Bạn chỉ cần cung cấp API Key / Secret để điền vào đây.
+ * Gửi thông báo chào mừng trên thiết bị khi đăng ký tài khoản mới thành công
  */
-export const SMS_GATEWAY_CONFIG = {
-  provider: 'esms', // 'speedsms' | 'esms' | 'twilio' | 'none'
-  apiKey: '48B4F00221174DD213DFBB337D4553',
-  secretKey: '38B9C6AE445BBD459C6C162E69890A',
-  // Brandname test do eSMS cấp sẵn cho tài khoản. Khi có Brandname riêng "MyLife" đã được duyệt, đổi tại đây.
-  brandName: 'Baotrixemay',
-  // Tin Brandname CSKH (SmsType 2) BẮT BUỘC khớp 100% một mẫu (template) đã duyệt, nếu không eSMS báo
-  // "Sai template Brandname CSKH" và tin bị tính là thất bại. Đây là mẫu đã duyệt của Brandname test.
-  templateMessage: 'Cam on quy khach da su dung dich vu cua chung toi. Chuc quy khach mot ngay tot lanh!',
-};
-
-/**
- * Chuẩn hóa số điện thoại Việt Nam về dạng 0xxxxxxxxx (chấp nhận +84..., 84..., 0..., hoặc 9 số không có số 0)
- */
-export function normalizeVnPhone(phone) {
-  let digits = String(phone || '').replace(/[^0-9]/g, '');
-  if (digits.startsWith('84') && digits.length >= 11) digits = '0' + digits.slice(2);
-  else if (!digits.startsWith('0') && digits.length === 9) digits = '0' + digits;
-  return digits;
-}
-
-/**
- * Gửi SMS thực tế qua cổng API (SpeedSMS, eSMS, Twilio)
- */
-export async function sendActualSms({ phone, message }) {
-  if (!phone) return { success: false, reason: 'Chưa có số điện thoại' };
-
-  const cleanPhone = normalizeVnPhone(phone);
-
-  try {
-    // 1. Cổng SpeedSMS (Việt Nam)
-    if (SMS_GATEWAY_CONFIG.provider === 'speedsms' && SMS_GATEWAY_CONFIG.apiKey) {
-      const authHeader = 'Basic ' + (typeof btoa !== 'undefined' ? btoa(SMS_GATEWAY_CONFIG.apiKey + ':x') : '');
-      const response = await fetch('https://api.speedsms.vn/index.php/sms/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authHeader,
-        },
-        body: JSON.stringify({
-          to: [cleanPhone],
-          content: message,
-          sms_type: 2, // 2: tin nhắn CSKH hoặc tin nhắn đầu số cố định
-          sender: SMS_GATEWAY_CONFIG.brandName || '',
-        }),
-      });
-      const data = await response.json();
-      console.log('[SpeedSMS Response]:', data);
-      return data;
-    }
-
-    // 2. Cổng eSMS.vn (Việt Nam)
-    if (SMS_GATEWAY_CONFIG.provider === 'esms' && SMS_GATEWAY_CONFIG.apiKey) {
-      const useBrand = !!SMS_GATEWAY_CONFIG.brandName;
-      console.log(`[eSMS] 🚀 Đang gửi SMS đến ${cleanPhone}...`);
-      const response = await fetch('https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          ApiKey: SMS_GATEWAY_CONFIG.apiKey,
-          SecretKey: SMS_GATEWAY_CONFIG.secretKey,
-          // Brandname CSKH chỉ chấp nhận nội dung đúng mẫu đã duyệt
-          Content: useBrand ? SMS_GATEWAY_CONFIG.templateMessage : message,
-          Phone: cleanPhone,
-          SmsType: useBrand ? '2' : '1', // 2: Brandname CSKH, 1: quảng cáo không Brandname
-          Brandname: SMS_GATEWAY_CONFIG.brandName || '',
-          IsUnicode: '0',
-        }),
-      });
-      const data = await response.json();
-      console.log('[eSMS Response]:', data);
-
-      const isSuccess = String(data?.CodeResult || data?.CodeResponse) === '100';
-      return {
-        success: isSuccess,
-        code: data?.CodeResult || data?.CodeResponse,
-        message: data?.ErrorMessage || (isSuccess ? 'Gửi SMS thành công' : 'Lỗi gửi SMS'),
-        raw: data,
-      };
-    }
-
-    // 3. Cổng Twilio (Quốc tế)
-    if (SMS_GATEWAY_CONFIG.provider === 'twilio' && SMS_GATEWAY_CONFIG.apiKey) {
-      const accountSid = SMS_GATEWAY_CONFIG.apiKey;
-      const authToken = SMS_GATEWAY_CONFIG.secretKey;
-      const fromNumber = SMS_GATEWAY_CONFIG.brandName;
-      const authHeader = 'Basic ' + (typeof btoa !== 'undefined' ? btoa(`${accountSid}:${authToken}`) : '');
-
-      let formattedPhone = cleanPhone;
-      if (formattedPhone.startsWith('0')) {
-        formattedPhone = '+84' + formattedPhone.slice(1);
-      }
-
-      const bodyData = `To=${encodeURIComponent(formattedPhone)}&From=${encodeURIComponent(fromNumber)}&Body=${encodeURIComponent(message)}`;
-      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-        method: 'POST',
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: bodyData,
-      });
-      return await response.json();
-    }
-  } catch (err) {
-    console.log('[SMS Gateway Error]:', err.message);
-    return { success: false, error: err.message };
-  }
-
-  return { success: false, reason: 'Chưa cấu hình API Key cổng SMS Gateway' };
-}
-
-/**
- * Gửi thông báo lịch trình đến SMS và Gmail
- */
-export async function sendScheduleAlert({ event, phone, email, triggerType = 'reminder', openNativeSms = true }) {
-  // Chuyển tiêu đề sang không dấu để SMS gửi nhanh, tiết kiệm ký tự và không bị lỗi font trên mọi dòng máy
-  const cleanTitle = (event.title || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
-  const timeDesc = `${event.time || ''} ngày ${event.date || ''}`;
-  const message = `[MyLife] Nhac lich: "${cleanTitle}" luc ${event.time || ''} ngay ${event.date || ''}.`;
-
-  console.log(`[SMS & Gmail Service] 📲 Đang gửi SMS đến: ${phone || 'Chưa cung cấp SĐT'}`);
-  console.log(`[SMS & Gmail Service] ✉️ Đang gửi Gmail đến: ${email || 'Chưa cung cấp Email'}`);
-  console.log(`[SMS & Gmail Service] 📋 Nội dung: ${message}`);
-
-  // Brandname CSKH chỉ cho gửi đúng mẫu cố định nên không thể mang nội dung lịch trình.
-  // Chỉ gửi qua cổng khi gateway cho phép nội dung tùy ý (không dùng Brandname mẫu).
-  const gatewayAllowsCustomContent = !!SMS_GATEWAY_CONFIG.apiKey && !SMS_GATEWAY_CONFIG.brandName;
-  let smsResult = null;
-  if (gatewayAllowsCustomContent) {
-    smsResult = await sendActualSms({ phone, message });
-    console.log('[SMS Gateway Response]:', smsResult);
-  }
-  const gatewayDelivered = !!smsResult?.success;
-
-  // Thông báo đẩy xác nhận đến thiết bị
-  try {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: gatewayDelivered ? '📲✉️ Đã gửi thông báo SMS & Gmail!' : '🔔 Đã lưu lịch trình',
-        body: gatewayDelivered
-          ? `Lịch trình "${event.title}" (${timeDesc}) đã được gửi tới ${phone || 'SĐT'} và ${email || 'Gmail'}.`
-          : `Lịch trình "${event.title}" (${timeDesc}) đã được lưu. Bạn sẽ nhận nhắc lịch trên thiết bị này.`,
-        sound: 'default',
-      },
-      trigger: null,
-    });
-  } catch (e) {}
-
-  // Nếu cổng SMS không gửi được nội dung lịch trình, đề xuất mở ứng dụng Tin nhắn của máy để gửi SMS thật qua SIM
-  if (!gatewayDelivered && phone && openNativeSms) {
-    Alert.alert(
-      '📲 Gửi tin nhắn SMS thật',
-      `Bạn có muốn mở ứng dụng Tin nhắn điện thoại để gửi SMS nhắc lịch "${event.title}" đến số ${phone} không?`,
-      [
-        { text: 'Để sau', style: 'cancel' },
-        {
-          text: 'Mở Tin Nhắn 📲',
-          onPress: () => {
-            const separator = Platform.OS === 'ios' ? '&' : '?';
-            const url = `sms:${normalizeVnPhone(phone)}${separator}body=${encodeURIComponent(message)}`;
-            Linking.openURL(url).catch((err) => {
-              console.log('Không mở được SMS app:', err);
-            });
-          },
-        },
-      ]
-    );
-  }
-
-  return { success: gatewayDelivered, timestamp: Date.now(), smsResult };
-}
-
-/**
- * Gửi thông báo SMS & Gmail chào mừng khi đăng ký tài khoản mới thành công
- */
-export async function sendWelcomeAccountAlert({ phone, email, stickers = [] }) {
-  console.log(`[Auth Alert] 🚀 Bắt đầu gửi SMS chào mừng đến SĐT: ${phone}`);
-  console.log(`[Auth Alert] Gửi Gmail chào mừng đến: ${email}`);
-
-  let smsResult = null;
-  if (phone) {
-    const welcomeMessage = '[MyLife] Chuc mung ban da dang ky tai khoan MyLife thanh cong! Chuc ban mot ngay moi tran day niem vui!';
-    smsResult = await sendActualSms({ phone, message: welcomeMessage });
-    console.log('[Auth Alert SMS Result]:', smsResult);
-
-    if (smsResult && smsResult.success) {
-      Alert.alert(
-        '📲 Đã gửi tin nhắn SMS!',
-        `Hệ thống eSMS đã gửi tin nhắn chào mừng tới số ${normalizeVnPhone(phone)}. Bạn kiểm tra hộp thư tin nhắn điện thoại nhé!`
-      );
-    } else {
-      // Hiện rõ lý do thất bại (mã lỗi eSMS) để biết chính xác vì sao số này chưa nhận được SMS
-      const reason = smsResult?.message || smsResult?.error || smsResult?.reason || 'Không rõ nguyên nhân';
-      Alert.alert(
-        '⚠️ Chưa gửi được SMS',
-        `Không gửi được SMS tới số ${normalizeVnPhone(phone)}.\nLý do: ${reason}${smsResult?.code ? ` (mã ${smsResult.code})` : ''}`
-      );
-    }
-  }
-
+export async function sendWelcomeAccountAlert({ stickers = [] }) {
   try {
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -384,7 +274,5 @@ export async function sendWelcomeAccountAlert({ phone, email, stickers = [] }) {
       trigger: null,
     });
   } catch (e) {}
-
-  return smsResult;
 }
 

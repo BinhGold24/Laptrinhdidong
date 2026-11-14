@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, Pressable, Modal, TextInput, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useModalKeyboardPadding } from '../utils/keyboardUtils';
+import { CategoryPickerRow } from '../components/CategoryPickerRow';
 
 export default function TodoModal({
   visible,
@@ -10,17 +12,21 @@ export default function TodoModal({
   editingTodo,
   newTodoTitle,
   setNewTodoTitle,
+  newTodoCategory = 'other',
+  setNewTodoCategory,
   onClose,
   onSaveTodo,
 }) {
+  const keyboardPadding = useModalKeyboardPadding(visible);
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
+      <View style={[styles.modalBackdrop, keyboardPadding > 0 && { paddingBottom: keyboardPadding }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.ink }]}>
+            <Text style={[styles.modalTitle, { color: theme.ink, flex: 1, paddingRight: 10 }]}>
               {editingTodo ? (lang === 'vi' ? 'Chỉnh sửa việc cần làm 📝' : 'Edit To-Do 📝') : t.modalTodoTitle}
             </Text>
             <Pressable style={[styles.closeButton, { backgroundColor: theme.surface }]} onPress={onClose}>
@@ -30,13 +36,23 @@ export default function TodoModal({
 
           <Text style={[styles.inputLabel, { color: theme.ink }]}>{t.todoContentLabel}</Text>
           <TextInput
-            style={[styles.textInput, { backgroundColor: theme.surface, borderColor: theme.border }]}
+            style={[styles.textInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.ink }]}
             value={newTodoTitle}
             onChangeText={setNewTodoTitle}
             placeholder={t.todoPlaceholder}
-            placeholderTextColor="#B6B1BB"
+            placeholderTextColor={theme.isDark ? '#7E7A8C' : '#B6B1BB'}
             maxLength={80}
           />
+
+          {setNewTodoCategory && (
+            <CategoryPickerRow
+              theme={theme}
+              t={t}
+              label={t.categoryLabel || (lang === 'en' ? 'Label' : 'Nhãn công việc')}
+              selectedCategory={newTodoCategory}
+              onSelect={setNewTodoCategory}
+            />
+          )}
 
           <Pressable style={[styles.saveButton, { backgroundColor: theme.primary }]} onPress={onSaveTodo}>
             <Text style={styles.saveButtonText}>

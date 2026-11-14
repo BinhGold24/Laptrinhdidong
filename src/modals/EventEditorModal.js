@@ -10,11 +10,14 @@ import {
   Platform,
   StyleSheet,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CUTE_STICKERS, CATEGORY_KEYS } from '../constants/data';
 import { dateLabel } from '../utils/dateUtils';
+import { useModalKeyboardPadding } from '../utils/keyboardUtils';
+import RemindBeforePicker from '../components/RemindBeforePicker';
 
 export default function EventEditorModal({
   visible,
@@ -37,7 +40,6 @@ export default function EventEditorModal({
   accountRole = 'guest', // 'guest' | 'member' | 'pro'
   ownedStickers = [],
   allStickers = CUTE_STICKERS,
-  userAccount = null,
   onOpenProModal,
   onOpenAuthModal,
 }) {
@@ -53,12 +55,25 @@ export default function EventEditorModal({
           'Tài khoản Thường chỉ có 1 sticker cơ bản. Hãy đăng ký bằng số điện thoại để nhận 3 sticker ngẫu nhiên hoặc nâng cấp PRO để mở toàn bộ!',
           [
             { text: 'Để sau', style: 'cancel' },
-            { text: 'Đăng Ký Ngay 🎁', onPress: onOpenAuthModal },
-            { text: 'Gói PRO 👑', onPress: onOpenProModal },
+            {
+              text: 'Đăng Ký Ngay 🎁',
+              onPress: () => {
+                onClose();
+                if (onOpenAuthModal) onOpenAuthModal();
+              },
+            },
+            {
+              text: 'Gói PRO 👑',
+              onPress: () => {
+                onClose();
+                if (onOpenProModal) onOpenProModal();
+              },
+            },
           ]
         );
         return;
       }
+      onClose();
       if (onOpenProModal) onOpenProModal();
       return;
     }
@@ -72,7 +87,13 @@ export default function EventEditorModal({
         'Tính năng xếp lịch lặp đi lặp lại (Hàng ngày, Hàng tuần, Hàng tháng) dành riêng cho Thành viên PRO. Hãy hoàn thành 20 tầng Kim Tự Tháp hoặc nâng cấp để sử dụng nhé!',
         [
           { text: 'Đóng', style: 'cancel' },
-          { text: 'Xem Gói PRO 👑', onPress: onOpenProModal },
+          {
+            text: 'Xem Gói PRO 👑',
+            onPress: () => {
+              onClose();
+              if (onOpenProModal) onOpenProModal();
+            },
+          },
         ]
       );
       return;
@@ -81,17 +102,17 @@ export default function EventEditorModal({
   };
 
 
+  const keyboardPadding = useModalKeyboardPadding(visible);
+
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.modalBackdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
+      <View style={[styles.modalBackdrop, keyboardPadding > 0 && { paddingBottom: keyboardPadding }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.modalHeader}>
-            <View>
+            <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={[styles.modalTitle, { color: theme.ink }]}>
                 {editingEvent ? t.modalEventEditTitle : t.modalEventNewTitle}
               </Text>
@@ -111,17 +132,17 @@ export default function EventEditorModal({
           >
             <Text style={[styles.inputLabel, { color: theme.ink }]}>{t.eventNameLabel}</Text>
             <TextInput
-              style={[styles.textInput, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              style={[styles.textInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.ink }]}
               value={form.title}
               onChangeText={(title) => setForm((current) => ({ ...current, title }))}
               placeholder={t.eventNamePlaceholder}
-              placeholderTextColor="#B6B1BB"
+              placeholderTextColor={theme.isDark ? '#7E7A8C' : '#B6B1BB'}
               maxLength={100}
             />
 
             {/* Sticker selector */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={[styles.inputLabel, { color: theme.ink }]}>{t.stickerAttachLabel}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 12, marginBottom: 6 }}>
+              <Text style={[styles.inputLabel, { color: theme.ink, marginTop: 0, marginBottom: 0 }]}>{t.stickerAttachLabel}</Text>
               <Text style={{ fontSize: 10, color: accountRole === 'pro' ? '#FFD700' : theme.muted, fontWeight: '700' }}>
                 {accountRole === 'pro'
                   ? '👑 PRO: Toàn bộ sticker'
@@ -202,8 +223,8 @@ export default function EventEditorModal({
             </Pressable>
 
             {pickerMode ? (
-              <View style={[styles.pickerContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                {Platform.OS === 'ios' ? (
+              Platform.OS === 'ios' ? (
+                <View style={[styles.pickerContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                   <View style={styles.pickerActions}>
                     <Pressable onPress={() => setPickerMode(null)}>
                       <Text style={{ color: theme.muted, fontSize: 13 }}>{t.cancel}</Text>
@@ -217,16 +238,38 @@ export default function EventEditorModal({
                       <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>{t.done}</Text>
                     </Pressable>
                   </View>
-                ) : null}
+                  <DateTimePicker
+                    value={pickerDraftDate}
+                    mode={pickerMode === 'date' ? 'date' : 'time'}
+                    display="spinner"
+                    onChange={handlePickerChange}
+                    accentColor={theme.primary}
+                  />
+                </View>
+              ) : (
                 <DateTimePicker
                   value={pickerDraftDate}
                   mode={pickerMode === 'date' ? 'date' : 'time'}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  display="default"
                   onChange={handlePickerChange}
-                  accentColor={theme.primary}
                 />
-              </View>
+              )
             ) : null}
+
+            {/* Chọn số phút thông báo trước khi đến lịch trình */}
+            <Text style={[styles.inputLabel, { color: theme.ink }]}>{t.remindBeforeLabel}</Text>
+            <RemindBeforePicker
+              theme={theme}
+              lang={lang}
+              t={t}
+              visible={visible}
+              minutes={form.remindBeforeMinutes || 0}
+              onChangeMinutes={(mins) =>
+                setForm((current) => ({ ...current, remindBeforeMinutes: mins }))
+              }
+              eventDate={form.date}
+              eventTime={form.time}
+            />
 
             <Text style={[styles.inputLabel, { color: theme.ink }]}>{t.categoryLabel}</Text>
             <View style={styles.categoryChoices}>
@@ -261,8 +304,8 @@ export default function EventEditorModal({
             </View>
 
             {/* Lặp lại lịch trình (Recurring) - Bản PRO */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-              <Text style={[styles.inputLabel, { color: theme.ink }]}>Lặp lại lịch trình (Tự động)</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
+              <Text style={[styles.inputLabel, { color: theme.ink, marginTop: 0, marginBottom: 0 }]}>Lặp lại lịch trình (Tự động)</Text>
               {!isProUser && (
                 <View style={[styles.proMiniBadge, { backgroundColor: '#FFD700' }]}>
                   <Text style={styles.proMiniBadgeText}>👑 PRO</Text>
@@ -306,55 +349,17 @@ export default function EventEditorModal({
               })}
             </View>
 
-            {/* Thông báo SMS & Gmail */}
-            <Pressable
-              style={[
-                styles.smsEmailCard,
-                {
-                  backgroundColor: form.sendSmsEmail ? theme.primaryLight : theme.surface,
-                  borderColor: form.sendSmsEmail ? theme.primary : theme.border,
-                },
-              ]}
-              onPress={() => {
-                if (accountRole === 'guest') {
-                  Alert.alert(
-                    'Tài khoản Thường (Chưa đăng ký)',
-                    'Để nhận thông báo lịch trình qua tin nhắn SMS và Email Gmail, bạn cần đăng ký số điện thoại và Gmail của mình.',
-                    [
-                      { text: 'Để sau', style: 'cancel' },
-                      { text: 'Đăng Ký Ngay 📲', onPress: onOpenAuthModal },
-                    ]
-                  );
-                  return;
-                }
-                setForm((c) => ({ ...c, sendSmsEmail: !c.sendSmsEmail }));
-              }}
-
-            >
-              <Ionicons
-                name={form.sendSmsEmail ? 'checkbox' : 'square-outline'}
-                size={22}
-                color={form.sendSmsEmail ? theme.primary : theme.muted}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.smsEmailTitle, { color: theme.ink }]}>
-                  Gửi thông báo lịch đến SMS và Gmail 📲✉️
-                </Text>
-                <Text style={[styles.smsEmailSub, { color: theme.muted }]}>
-                  {userAccount
-                    ? `Đến SĐT: ${userAccount.phone} & Gmail: ${userAccount.email}`
-                    : 'Chạm để đăng ký SĐT & Gmail nhận thông báo'}
-                </Text>
-              </View>
-            </Pressable>
-
             <Text style={[styles.inputLabel, { color: theme.ink, marginTop: 12 }]}>{t.noteLabel}</Text>
             <TextInput
-              style={[styles.textInput, styles.descriptionInput, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              style={[
+                styles.textInput,
+                styles.descriptionInput,
+                { backgroundColor: theme.surface, borderColor: theme.border, color: theme.ink },
+              ]}
               value={form.description}
               onChangeText={(description) => setForm((current) => ({ ...current, description }))}
               placeholder={t.notePlaceholder}
-              placeholderTextColor="#B6B1BB"
+              placeholderTextColor={theme.isDark ? '#7E7A8C' : '#B6B1BB'}
               multiline
               maxLength={250}
             />
@@ -375,7 +380,7 @@ export default function EventEditorModal({
             </Pressable>
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -389,6 +394,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 26,
     maxHeight: '92%',
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#D6D0DA', alignSelf: 'center', marginBottom: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
@@ -450,27 +460,23 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   proMiniBadgeText: { fontSize: 9, fontWeight: '900', color: '#6A4300' },
-  repeatChoices: { flexDirection: 'row', gap: 6, marginBottom: 12 },
+  repeatChoices: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 8,
+    marginBottom: 12,
+  },
   repeatChoice: {
-    flex: 1,
+    width: '48.5%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 12,
     borderWidth: 1,
   },
-  repeatChoiceText: { fontSize: 11 },
-  smsEmailCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  smsEmailTitle: { fontSize: 12, fontWeight: '700' },
-  smsEmailSub: { fontSize: 10, marginTop: 2 },
+  repeatChoiceText: { fontSize: 11.5, textAlign: 'center' },
 });
 

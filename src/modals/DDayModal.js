@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, Modal, TextInput, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useModalKeyboardPadding } from '../utils/keyboardUtils';
 
 export default function DDayModal({
   visible,
@@ -15,14 +16,16 @@ export default function DDayModal({
   onClose,
   onCreateDDay,
 }) {
+  const keyboardPadding = useModalKeyboardPadding(visible);
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
+      <View style={[styles.modalBackdrop, keyboardPadding > 0 && { paddingBottom: keyboardPadding }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.ink }]}>{t.modalDDayTitle}</Text>
+            <Text style={[styles.modalTitle, { color: theme.ink, flex: 1, paddingRight: 10 }]}>{t.modalDDayTitle}</Text>
             <Pressable style={[styles.closeButton, { backgroundColor: theme.surface }]} onPress={onClose}>
               <Ionicons name="close" size={20} color={theme.ink} />
             </Pressable>
@@ -30,21 +33,21 @@ export default function DDayModal({
 
           <Text style={[styles.inputLabel, { color: theme.ink }]}>{t.ddayNameLabel}</Text>
           <TextInput
-            style={[styles.textInput, { backgroundColor: theme.surface, borderColor: theme.border }]}
+            style={[styles.textInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.ink }]}
             value={newDDayTitle}
             onChangeText={setNewDDayTitle}
             placeholder={t.ddayNamePlaceholder}
-            placeholderTextColor="#B6B1BB"
+            placeholderTextColor={theme.isDark ? '#7E7A8C' : '#B6B1BB'}
             maxLength={60}
           />
 
           <Text style={[styles.inputLabel, { color: theme.ink }]}>{t.targetDateInputLabel}</Text>
           <TextInput
-            style={[styles.textInput, { backgroundColor: theme.surface, borderColor: theme.border }]}
+            style={[styles.textInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.ink }]}
             value={newDDayDate}
             onChangeText={setNewDDayDate}
             placeholder="2026-12-25"
-            placeholderTextColor="#B6B1BB"
+            placeholderTextColor={theme.isDark ? '#7E7A8C' : '#B6B1BB'}
           />
 
           <Text style={[styles.inputLabel, { color: theme.ink }]}>{t.chooseIconLabel}</Text>

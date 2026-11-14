@@ -3,3 +3,6 @@ node_modules/
 npm-debug.*
 *.jks
 *.keystore
+.env
+.env.local
+.env.*.local

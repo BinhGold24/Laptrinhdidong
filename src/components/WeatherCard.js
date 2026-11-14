@@ -28,7 +28,7 @@ export default function WeatherCard({
         <Pressable
           style={[styles.weatherBadge, { backgroundColor: theme.accentLight }]}
           onPress={onPressWeather}
-          accessibilityLabel="Cập nhật thời tiết / Refresh weather"
+          accessibilityLabel={lang === 'vi' ? 'Cập nhật thời tiết' : 'Refresh weather'}
         >
           <Text style={{ fontSize: 22 }}>{weather.icon}</Text>
           <Text style={[styles.weatherTemp, { color: theme.ink }]}>{weather.temp}°C</Text>
@@ -47,7 +47,7 @@ export default function WeatherCard({
           <Text style={{ fontSize: 22 }}>
             {selectedDateMood ? MOOD_KEYS.find((m) => m.key === selectedDateMood.key)?.emoji || '🥰' : '💌'}
           </Text>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.moodBarTitle, { color: theme.ink }]}>
               {selectedDateMood ? `${t.moodPrefix}: ${t.moods[selectedDateMood.key]}` : t.howAreYouToday}
             </Text>

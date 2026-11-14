@@ -2,12 +2,13 @@ import React from 'react';
 import { View, Text, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import WeatherCard from '../components/WeatherCard';
+import AiBriefingCard from '../components/AiBriefingCard';
 import CountdownList from '../components/CountdownList';
 import HabitSection from '../components/HabitSection';
 import TodoSection from '../components/TodoSection';
 import EventCard from '../components/EventCard';
 
-export default function HomeScreen({
+export default React.memo(function HomeScreen({
   theme,
   lang,
   t,
@@ -38,6 +39,11 @@ export default function HomeScreen({
   onEditEvent,
   onDeleteEvent,
   onOpenNewEvent,
+  aiEnabled = true,
+  aiBriefing = null,
+  aiBriefingLoading = false,
+  onRefreshAiBriefing,
+  onReportAi,
 }) {
   return (
     <>
@@ -53,6 +59,18 @@ export default function HomeScreen({
         onPressMood={onPressMood}
       />
 
+      {/* Tính năng #2: Bản tin & Gợi ý đầu ngày từ AI */}
+      {aiEnabled && (
+        <AiBriefingCard
+          theme={theme}
+          lang={lang}
+          briefing={aiBriefing}
+          loading={aiBriefingLoading}
+          onRefresh={onRefreshAiBriefing}
+          onReport={onReportAi}
+        />
+      )}
+
       {/* D-Day Carousel */}
       <CountdownList
         theme={theme}
@@ -66,6 +84,7 @@ export default function HomeScreen({
       {/* Habit Section */}
       <HabitSection
         theme={theme}
+        lang={lang}
         t={t}
         habits={habits}
         selectedDateStr={selectedDateStr}
@@ -88,17 +107,17 @@ export default function HomeScreen({
 
       {/* Daily Events Header */}
       <View style={styles.agendaHeader}>
-        <View>
+        <View style={{ flex: 1, paddingRight: 10 }}>
           <Text style={[styles.sectionTitle, { color: theme.ink }]}>{t.todayAgendaTitle}</Text>
           <Text style={[styles.agendaDate, { color: theme.muted }]}>
             {t.weekdays[(selectedDate.getDay() + 6) % 7]}, {selectedDate.getDate()}{' '}
             {t.months[selectedDate.getMonth()].toLowerCase()} · {t.itemsCount(dayEvents.length)}
           </Text>
         </View>
-        <View style={[styles.progressBadge, { backgroundColor: theme.greenLight }]}>
+        <View style={[styles.progressBadge, { backgroundColor: theme.greenLight, flexShrink: 0 }]}>
           <Ionicons name="checkmark-done" size={15} color={theme.green} />
           <Text style={[styles.progressText, { color: theme.green }]}>
-            {completedEventsCount}/{dayEvents.length}
+            {dayEvents.filter((e) => e.completed).length}/{dayEvents.length}
           </Text>
         </View>
       </View>
@@ -110,21 +129,19 @@ export default function HomeScreen({
           <Text style={[styles.emptyCaption, { color: theme.muted }]}>{t.loadingEvents}</Text>
         </View>
       ) : dayEvents.length ? (
-        <FlatList
-          data={dayEvents}
-          renderItem={({ item }) => (
+        <View style={{ gap: 10 }}>
+          {dayEvents.map((item, index) => (
             <EventCard
+              key={String(item.id || index)}
               theme={theme}
+              t={t}
               event={item}
               onToggle={onToggleEvent}
               onEdit={onEditEvent}
               onDelete={onDeleteEvent}
             />
-          )}
-          keyExtractor={(item, index) => String(item.id || index)}
-          scrollEnabled={false}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        />
+          ))}
+        </View>
       ) : (
         <View style={[styles.emptyState, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={[styles.emptyIllustration, { backgroundColor: theme.primaryLight }]}>
@@ -143,7 +160,7 @@ export default function HomeScreen({
       )}
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   agendaHeader: {

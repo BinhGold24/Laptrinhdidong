@@ -15,7 +15,7 @@ export default function PyramidRewardModal({
   onUpgradeProPackage,
   onOpenAuthModal,
 }) {
-  const [selectedPackage, setSelectedPackage] = useState('3months'); // '3months' | '6months'
+  const [selectedPackage, setSelectedPackage] = useState('3months'); // '1month' | '3months' | '6months'
   const isEligibleForTrial = completedCount >= 20 && !proTrialUsed;
 
   const handleClaimTrial = () => {
@@ -62,14 +62,14 @@ export default function PyramidRewardModal({
 
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
           <View style={styles.sheetHandle} />
 
           <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={[styles.modalTitle, { color: theme.ink }]}>
                 {isEligibleForTrial ? '🎉 Quà Tặng 20 Tầng Kim Tự Tháp' : '👑 Gói Thành Viên PRO'}
               </Text>
@@ -135,19 +135,9 @@ export default function PyramidRewardModal({
                   </Text>
                 </View>
               </View>
-
-              <View style={styles.benefitRow}>
-                <Ionicons name="notifications-outline" size={20} color="#4EA8DE" />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.benefitTitle, { color: theme.ink }]}>Nhắc nhở qua SMS & Gmail</Text>
-                  <Text style={[styles.benefitDesc, { color: theme.muted }]}>
-                    Đồng bộ gửi thông báo đến số điện thoại và Gmail của bạn.
-                  </Text>
-                </View>
-              </View>
             </View>
 
-            {/* Mục Ưu Đãi: 79k/3 tháng hoặc 150k/6 tháng (Giá gốc 30k/tháng) */}
+            {/* Mục Ưu Đãi: 30k/1 tháng, 79k/3 tháng hoặc 150k/6 tháng (Giá gốc 30k/tháng) */}
             <View style={{ marginTop: 14 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
                 <Text style={[styles.sectionHeading, { color: theme.ink, flexShrink: 1 }]}>
@@ -157,6 +147,34 @@ export default function PyramidRewardModal({
                   (Giá gốc: 30k/tháng)
                 </Text>
               </View>
+
+              {/* Lựa chọn 0: 30k / 1 tháng */}
+              <Pressable
+                style={[
+                  styles.packageCard,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: selectedPackage === '1month' ? theme.primary : theme.border,
+                  },
+                  selectedPackage === '1month' && { borderWidth: 2, backgroundColor: theme.primaryLight },
+                ]}
+                onPress={() => setSelectedPackage('1month')}
+              >
+                <View style={{ flex: 1, paddingRight: 8, justifyContent: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                    <Text style={[styles.packageName, { color: theme.ink, flexShrink: 1 }]}>Gói 1 Tháng Linh Hoạt</Text>
+                  </View>
+                  <Text style={[styles.packageCalc, { color: theme.muted }]}>
+                    30.000đ/tháng • Dùng thử không ràng buộc
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', justifyContent: 'center', minWidth: 76 }}>
+                  <Text style={[styles.packagePrice, { color: theme.primary }]}>30.000đ</Text>
+                </View>
+                {selectedPackage === '1month' && (
+                  <Ionicons name="checkmark-circle" size={22} color={theme.primary} style={{ marginLeft: 6 }} />
+                )}
+              </Pressable>
 
               {/* Lựa chọn 1: 79k / 3 tháng */}
               <Pressable
@@ -223,13 +241,17 @@ export default function PyramidRewardModal({
               </Pressable>
             </View>
 
-            {/* Nút đăng ký gói ưu đãi */}
+            {/* Nút đăng ký gói ưu đãi qua VietQR SePay */}
             <Pressable
               style={[styles.primaryActionBtn, { backgroundColor: theme.primary, marginTop: 16 }]}
               onPress={handleBuyPackage}
             >
               <Text style={styles.primaryActionBtnText}>
-                👑 Đăng ký gói {selectedPackage === '3months' ? '79.000đ / 3 tháng' : '150.000đ / 6 tháng'}
+                💳 Thanh toán VietQR gói {selectedPackage === '1month'
+                  ? '30.000đ (1 tháng)'
+                  : selectedPackage === '3months'
+                  ? '79.000đ (3 tháng)'
+                  : '150.000đ (6 tháng)'}
               </Text>
             </Pressable>
           </ScrollView>
@@ -251,9 +273,9 @@ const styles = StyleSheet.create({
   },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#D6D0DA', alignSelf: 'center', marginBottom: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: '800' },
+  modalTitle: { fontSize: 18, fontWeight: '800' },
   modalSubtitle: { fontSize: 12, marginTop: 2 },
-  closeButton: { width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  closeButton: { width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   rewardBox: {
     borderRadius: 20,
     borderWidth: 1.5,
@@ -261,16 +283,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: 'center',
   },
-  rewardBoxTitle: { fontSize: 16, fontWeight: '900', color: '#D35400', textAlign: 'center', marginBottom: 6 },
+  rewardBoxTitle: { fontSize: 15, fontWeight: '900', color: '#D35400', textAlign: 'center', marginBottom: 6 },
   rewardBoxDesc: { fontSize: 12, color: '#555', textAlign: 'center', lineHeight: 18, marginBottom: 14 },
   primaryActionBtn: {
     width: '100%',
     paddingVertical: 14,
+    paddingHorizontal: 14,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryActionBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  primaryActionBtnText: {
+    color: '#fff',
+    fontSize: 13.5,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 19,
+  },
   benefitsCard: {
     borderRadius: 18,
     borderWidth: 1,

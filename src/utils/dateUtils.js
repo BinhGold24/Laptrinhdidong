@@ -38,13 +38,17 @@ export function isValidTime(value) {
   return Boolean(match && Number(match[1]) < 24 && Number(match[2]) < 60);
 }
 
-export function calculateDDay(targetDateStr) {
+export function daysRemaining(targetDateStr) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = parseDateTime(targetDateStr, '00:00');
   target.setHours(0, 0, 0, 0);
   const diffTime = target.getTime() - today.getTime();
-  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
+}
+
+export function calculateDDay(targetDateStr) {
+  const diffDays = daysRemaining(targetDateStr);
   if (diffDays === 0) return 'D-Day';
   if (diffDays > 0) return `D-${diffDays}`;
   return `D+${Math.abs(diffDays)}`;
@@ -59,4 +63,47 @@ export function getWeek(date) {
     day.setDate(monday.getDate() + index);
     return day;
   });
+}
+
+/**
+ * Trả về chuỗi chỉ hiển thị 1 ngôn ngữ theo cấu hình (loại bỏ dạng song ngữ 'Tiếng Việt / English')
+ */
+export function localizeText(text, lang = 'vi') {
+  if (!text || typeof text !== 'string') return '';
+  if (text.includes(' / ')) {
+    const parts = text.split(' / ');
+    return (lang === 'en' ? (parts[1] || parts[0]) : parts[0]).trim();
+  }
+  return text;
+}
+
+/**
+ * Giới hạn số phút nhắc trước hợp lệ trong khoảng 0..1440 (24 giờ)
+ */
+export function clampRemindMinutes(value) {
+  const num = parseInt(value, 10);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  return Math.min(1440, num);
+}
+
+/**
+ * Tính thời điểm Date sẽ phát thông báo nhắc trước dựa trên ngày, giờ bắt đầu và số phút báo trước
+ */
+export function getRemindBeforeDate(dateValue, timeValue, remindBeforeMinutes = 0) {
+  const startDate = parseDateTime(dateValue, timeValue);
+  const mins = clampRemindMinutes(remindBeforeMinutes);
+  return new Date(startDate.getTime() - mins * 60 * 1000);
+}
+
+/**
+ * Định dạng nhãn số phút báo trước lịch trình (ví dụ: "Đúng giờ (0 phút)", "Trước 10 phút", "Trước 1 giờ")
+ */
+export function formatRemindBeforeLabel(minutes, lang = 'vi') {
+  const m = clampRemindMinutes(minutes);
+  if (m === 0) return lang === 'en' ? 'On time' : 'Đúng giờ (0 phút)';
+  if (m % 60 === 0) {
+    const hrs = m / 60;
+    return lang === 'en' ? `${hrs} hr before` : `Trước ${hrs} giờ`;
+  }
+  return lang === 'en' ? `${m} min before` : `Trước ${m} phút`;
 }

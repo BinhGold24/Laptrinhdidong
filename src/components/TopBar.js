@@ -1,31 +1,36 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { MOOD_KEYS } from '../constants/data';
 
 export default function TopBar({
   theme,
   lang,
   t,
-  onToggleLang,
   selectedDateSticker,
   selectedDateMood,
   onPressSticker,
   onPressProfile,
   isProUser = false,
   accountRole = 'guest', // 'guest' | 'member' | 'pro'
+  userAccount = null,
   onPressPro,
   onPressAuth,
+  onOpenSettings,
 }) {
   return (
     <View style={styles.topBar}>
-      <Pressable style={styles.brand} onPress={onPressProfile}>
+      <Pressable
+        style={styles.brand}
+        onPress={accountRole === 'guest' && onPressAuth ? onPressAuth : onPressProfile}
+      >
         <View style={[styles.brandIcon, { backgroundColor: accountRole === 'pro' ? '#FFD700' : theme.primary }]}>
           <Text style={{ fontSize: 16 }}>{accountRole === 'pro' ? '👑' : accountRole === 'member' ? '🐰' : theme.icon}</Text>
         </View>
-        <View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 }}>
             <Text style={[styles.brandName, { color: theme.ink }]}>
-              CalendarCute<Text style={{ color: theme.primary }}>.</Text>
+              MyLife<Text style={{ color: theme.primary }}>.</Text>
             </Text>
             {accountRole === 'pro' && (
               <View style={[styles.proPill, { backgroundColor: '#FFD700' }]}>
@@ -43,44 +48,26 @@ export default function TopBar({
               </View>
             )}
           </View>
-          <Text style={[styles.brandTagline, { color: theme.muted }]}>
-            {accountRole === 'guest' ? 'Chưa đăng ký • Chạm để tạo' : t.brandTagline}
+          <Text style={[styles.brandTagline, { color: theme.muted }]} numberOfLines={1}>
+            {accountRole === 'guest'
+              ? (lang === 'vi' ? 'Chưa đăng ký • Chạm để tạo' : 'Guest • Tap to register')
+              : `${userAccount?.phone || 'Cá nhân'} • ${lang === 'vi' ? 'Lịch cá nhân' : 'My Schedule'}`}
           </Text>
         </View>
       </Pressable>
 
-
-
       <View style={styles.topBarActions}>
-        {/* Quick Language Switcher */}
+        {/* Nút Cài đặt (Ngôn ngữ, Dark Mode, Màu nền, Sticker) ĐẶT Ở GÓC TRÊN BÊN PHẢI */}
         <Pressable
-          style={[styles.langTogglePill, { backgroundColor: theme.surface, borderColor: theme.border }]}
-          onPress={() => onToggleLang(lang === 'vi' ? 'en' : 'vi')}
-          accessibilityLabel="Chuyển ngôn ngữ / Switch language"
+          style={({ pressed }) => [
+            styles.settingsBtn,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] },
+          ]}
+          onPress={onOpenSettings}
+          accessibilityLabel="Cài đặt giao diện & Ngôn ngữ"
         >
-          <Text style={{ fontSize: 14 }}>{lang === 'vi' ? '🇻🇳' : '🇬🇧'}</Text>
-          <Text style={[styles.langToggleText, { color: theme.ink }]}>
-            {lang === 'vi' ? 'VI' : 'EN'}
-          </Text>
-        </Pressable>
-
-        {/* Sticker Button */}
-        <Pressable
-          style={[styles.cuteIconButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
-          onPress={onPressSticker}
-          accessibilityLabel={t.stickerA11y}
-        >
-          <Text style={{ fontSize: 18 }}>{selectedDateSticker || '🎀'}</Text>
-        </Pressable>
-
-        {/* Avatar / Mood Button */}
-        <Pressable
-          style={[styles.avatar, { backgroundColor: theme.primaryLight, borderColor: theme.primary }]}
-          onPress={onPressProfile}
-        >
-          <Text style={{ fontSize: 16 }}>
-            {selectedDateMood ? MOOD_KEYS.find((m) => m.key === selectedDateMood.key)?.emoji || '🌸' : '🐰'}
-          </Text>
+          <Ionicons name="settings-outline" size={20} color={theme.ink} />
         </Pressable>
       </View>
     </View>
@@ -89,13 +76,19 @@ export default function TopBar({
 
 const styles = StyleSheet.create({
   topBar: {
-    height: 60,
+    height: 58,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brand: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 10,
+  },
   brandIcon: {
     width: 34,
     height: 34,
@@ -106,16 +99,14 @@ const styles = StyleSheet.create({
   brandName: { fontSize: 19, fontWeight: '800', letterSpacing: -0.6 },
   brandTagline: { fontSize: 10, marginTop: -2, fontWeight: '500' },
   topBarActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  langTogglePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 12,
+  settingsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 13,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  langToggleText: { fontSize: 11, fontWeight: '800' },
   cuteIconButton: {
     width: 36,
     height: 36,

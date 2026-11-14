@@ -22,6 +22,7 @@ export default function ProfileScreen({
   onLogout,
   bottomBannerVisible = true,
   onShowBanner,
+  onOpenSettings,
 }) {
   return (
     <View style={styles.profileScreen}>
@@ -48,7 +49,7 @@ export default function ProfileScreen({
           </Text>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 6 }}>
           <Text style={[styles.profileName, { color: theme.ink }]}>
             {accountRole === 'pro'
               ? (userAccount?.phone || 'Thành Viên PRO')
@@ -78,8 +79,8 @@ export default function ProfileScreen({
           {accountRole === 'pro'
             ? `Đặc quyền PRO VIP đang hoạt động (Còn ${proDaysLeft} ngày). Full sticker, không quảng cáo.`
             : accountRole === 'member'
-            ? `Gmail: ${userAccount?.email || 'Chưa cập nhật'} • Sở hữu ${ownedStickers.length} sticker • Nhắc lịch SMS & Email`
-            : 'Tài khoản thường có 1 sticker cơ bản. Đăng ký để nhận 3 sticker ngẫu nhiên và kích hoạt SMS/Gmail!'}
+            ? `Email: ${userAccount?.email || 'Chưa cập nhật'} • Sở hữu ${ownedStickers.length} sticker xinh xắn`
+            : 'Tài khoản thường có 1 sticker cơ bản. Đăng ký để đồng bộ lịch và nhận 3 sticker ngẫu nhiên!'}
         </Text>
 
         {accountRole !== 'guest' ? (
@@ -105,7 +106,7 @@ export default function ProfileScreen({
             onPress={onOpenAuthModal}
           >
             <Ionicons name="gift-outline" size={16} color="#fff" />
-            <Text style={styles.primaryLoginBtnText}>Đăng ký SĐT (Nhận 3 Sticker & Bật SMS/Gmail) 🎁</Text>
+            <Text style={styles.primaryLoginBtnText}>Đăng ký tài khoản (Nhận 3 Sticker) 🎁</Text>
           </Pressable>
         )}
       </View>
@@ -115,7 +116,7 @@ export default function ProfileScreen({
         style={[
           styles.proCardBanner,
           {
-            backgroundColor: accountRole === 'pro' ? '#FFF8E7' : theme.surface,
+            backgroundColor: accountRole === 'pro' ? (theme.isDark ? '#3A301C' : '#FFF8E7') : theme.surface,
             borderColor: accountRole === 'pro' ? '#FFD166' : theme.primary,
           },
         ]}
@@ -125,15 +126,15 @@ export default function ProfileScreen({
           <Text style={{ fontSize: 28 }}>{accountRole === 'pro' ? '👑' : '🏛️'}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.proCardTitle, { color: theme.ink }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <Text style={[styles.proCardTitle, { color: theme.ink, flexShrink: 1 }]}>
               {accountRole === 'pro' ? 'Bạn là Thành Viên PRO 👑' : 'Kim Tự Tháp 20 Tầng & Bản PRO'}
             </Text>
           </View>
           <Text style={[styles.proCardSub, { color: theme.muted }]}>
             {accountRole === 'pro'
               ? `Hạn dùng: Còn ${proDaysLeft} ngày. Không quảng cáo, full sticker, lặp lịch.`
-              : 'Hoàn thành 20 tầng tặng 3 ngày dùng thử. Ưu đãi 79k/3 tháng hoặc 150k/6 tháng!'}
+              : 'Hoàn thành 20 tầng tặng 3 ngày dùng thử. Gói 30k (1 tháng), 79k (3 tháng) hoặc 150k (6 tháng)!'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={theme.primary} />
@@ -148,66 +149,6 @@ export default function ProfileScreen({
           <Text style={[styles.accountActionText, { color: '#D46B78', fontSize: 12 }]}>Hủy gói PRO</Text>
         </Pressable>
       )}
-
-
-
-
-
-      {/* Theme Selector */}
-      <View style={styles.sectionWrap}>
-        <Text style={[styles.sectionTitle, { color: theme.ink, marginBottom: 12 }]}>
-          {t.themeSectionTitle}
-        </Text>
-        <View style={styles.themeGrid}>
-          {Object.values(THEMES).map((thItem) => {
-            const isSelected = thItem.id === currentThemeKey;
-            return (
-              <Pressable
-                key={thItem.id}
-                onPress={() => onSaveTheme(thItem.id)}
-                style={[
-                  styles.themeCard,
-                  { backgroundColor: thItem.background, borderColor: isSelected ? thItem.primary : thItem.border },
-                  isSelected && { borderWidth: 2 },
-                ]}
-              >
-                <Text style={{ fontSize: 24, marginBottom: 4 }}>{thItem.icon}</Text>
-                <Text style={[styles.themeCardName, { color: thItem.ink }]}>{thItem.name}</Text>
-                <View style={[styles.themeColorDot, { backgroundColor: thItem.primary }]} />
-                {isSelected && (
-                  <View style={[styles.themeCheckmark, { backgroundColor: thItem.primary }]}>
-                    <Ionicons name="checkmark" size={12} color="#fff" />
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Sync Info */}
-      <View style={[styles.profileInfo, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Ionicons name="cloud-done-outline" size={21} color={theme.green} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.infoTitle, { color: theme.ink }]}>{t.syncTitle}</Text>
-          <Text style={[styles.infoSubtitle, { color: theme.muted }]}>{t.syncSub}</Text>
-        </View>
-        <View style={[styles.onlineDot, { backgroundColor: theme.green }]} />
-      </View>
-
-      <Pressable
-        style={[styles.profileInfo, { backgroundColor: theme.surface, borderColor: theme.border }]}
-        onPress={onRefreshData}
-      >
-        <Ionicons name="refresh-outline" size={21} color={theme.primary} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.infoTitle, { color: theme.ink }]}>{t.refreshTitle}</Text>
-          <Text style={[styles.infoSubtitle, { color: theme.muted }]}>{t.refreshSub}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={theme.muted} />
-      </Pressable>
-
-
     </View>
   );
 }
@@ -222,11 +163,12 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
-    paddingVertical: 22,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
   },
   profileAvatar: { width: 68, height: 68, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   profileName: { fontSize: 16, fontWeight: '800' },
-  profileCaption: { fontSize: 11, marginTop: 4 },
+  profileCaption: { fontSize: 11.5, marginTop: 6, textAlign: 'center', lineHeight: 16, paddingHorizontal: 4 },
   proBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -252,13 +194,22 @@ const styles = StyleSheet.create({
   primaryLoginBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-    marginTop: 12,
+    width: '100%',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 15,
+    marginTop: 16,
   },
-  primaryLoginBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  primaryLoginBtnText: {
+    color: '#fff',
+    fontSize: 11.5,
+    fontWeight: '800',
+    textAlign: 'center',
+    flexShrink: 1,
+    lineHeight: 17,
+  },
   proCardBanner: {
     borderRadius: 18,
     borderWidth: 1.5,
